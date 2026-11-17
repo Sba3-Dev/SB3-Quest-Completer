@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.1.9"
+VERSION = "0.2.0"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1291,11 +1291,11 @@ class QuestCompleterApp:
     def build_account_widget(self, parent: tk.Frame) -> None:
         account = tk.Frame(parent, bg=BG)
         account.pack(side="right", padx=(18, 0))
-        self.account_avatar = tk.Canvas(account, width=200, height=200, bg=BG,
+        self.account_avatar = tk.Canvas(account, width=86, height=86, bg=BG,
                                        highlightthickness=0, bd=0, cursor="hand2")
         self.account_avatar.pack(side="left")
-        self.account_avatar_item = self.account_avatar.create_text(100, 100, text="?", fill=TEXT,
-                                                                    font=("Segoe UI", 30, "bold"))
+        self.account_avatar_item = self.account_avatar.create_text(43, 43, text="?", fill=TEXT,
+                                                                    font=("Segoe UI", 18, "bold"))
         self.account_avatar.bind("<Button-1>", lambda _event: self.toggle_account_menu())
         user_info = load_discord_session().get("user") or {}
         self.account_avatar_image = None
@@ -1330,9 +1330,9 @@ class QuestCompleterApp:
             return
         try:
             image = Image.open(io.BytesIO(raw)).convert("RGBA")
-            image = ImageOps.fit(image, (200, 200), Image.Resampling.LANCZOS)
-            mask = Image.new("L", (200, 200), 0)
-            ImageDraw.Draw(mask).ellipse((0, 0, 199, 199), fill=255)
+            image = ImageOps.fit(image, (86, 86), Image.Resampling.LANCZOS)
+            mask = Image.new("L", (86, 86), 0)
+            ImageDraw.Draw(mask).ellipse((0, 0, 85, 85), fill=255)
             image.putalpha(mask)
             self.account_avatar_image = ImageTk.PhotoImage(image)
             thumb = ImageOps.fit(image.convert("RGBA"), (48, 48), Image.Resampling.LANCZOS)
@@ -1694,7 +1694,7 @@ class QuestCompleterApp:
         return "break"
 
     def _add_panel_logo(self, panel: tk.Frame, size: int = 80) -> None:
-        logo_label = tk.Label(panel, bg=PANEL)
+        logo_label = tk.Label(panel, bg=str(panel.cget("bg")))
         logo_label.pack(pady=(4, 9))
         icon_path = resource_path("logo.ico")
         if Image and icon_path.exists():
