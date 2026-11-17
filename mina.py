@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.2.4"
+VERSION = "0.2.5"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1307,8 +1307,11 @@ class QuestCompleterApp:
         self.account_avatar = tk.Canvas(account, width=24, height=24, bg=BG,
                                        highlightthickness=0, bd=0, cursor="hand2")
         self.account_avatar.pack(side="left")
-        self.account_avatar_item = self.account_avatar.create_text(12, 12, text=self._avatar_initials(user_info), fill=TEXT,
-                                                                    font=("Segoe UI", 8, "bold"))
+        self.account_avatar_item = self.account_avatar.create_image(12, 12, anchor="center", image="")
+        self.account_avatar_fallback = self.account_avatar.create_text(
+            12, 12, text=self._avatar_initials(user_info), fill=TEXT,
+            font=("Segoe UI", 8, "bold"), anchor="center"
+        )
         self.account_avatar.bind("<Button-1>", lambda _event: self.toggle_account_menu())
         self.account_avatar_image = None
         self.account_avatar_thumb_image = None
@@ -1355,13 +1358,14 @@ class QuestCompleterApp:
             mask = Image.new("L", (24, 24), 0)
             ImageDraw.Draw(mask).ellipse((0, 0, 23, 23), fill=255)
             image.putalpha(mask)
-            self.account_avatar_image = ImageTk.PhotoImage(image)
+            self.account_avatar_image = ImageTk.PhotoImage(image, master=self.root)
             thumb = ImageOps.fit(image.convert("RGBA"), (24, 24), Image.Resampling.LANCZOS)
             thumb_mask = Image.new("L", (24, 24), 0)
             ImageDraw.Draw(thumb_mask).ellipse((0, 0, 23, 23), fill=255)
             thumb.putalpha(thumb_mask)
-            self.account_avatar_thumb_image = ImageTk.PhotoImage(thumb)
-            self.account_avatar.itemconfigure(self.account_avatar_item, image=self.account_avatar_image, text="")
+            self.account_avatar_thumb_image = ImageTk.PhotoImage(thumb, master=self.root)
+            self.account_avatar.itemconfigure(self.account_avatar_item, image=self.account_avatar_image, state="normal")
+            self.account_avatar.itemconfigure(self.account_avatar_fallback, state="hidden")
         except (OSError, tk.TclError):
             pass
 
