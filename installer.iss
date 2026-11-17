@@ -1,5 +1,5 @@
 #define MyAppName "SB3 Quest Completer"
-#define MyAppVersion "0.1.8"
+#define MyAppVersion "0.1.9"
 #define MyAppPublisher "Sba3 Dev"
 #define MyAppExeName "SB3QuestCompleter.exe"
 
@@ -16,6 +16,8 @@ Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode=x64compatible
+CloseApplications=yes
+RestartApplications=yes
 SetupIconFile=logo.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
