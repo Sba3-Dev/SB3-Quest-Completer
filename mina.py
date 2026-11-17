@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1075,6 +1075,10 @@ class QuestCompleterApp:
         self.update_button = PillButton(content, text=self.tr("update_button"), command=self.install_latest_update,
                                         fill=RED, hover_fill=RED_HOVER, width=190, height=42, background=PANEL)
         self.update_button.pack(pady=6)
+        self.cancel_button = PillButton(content, text=self.tr("cancel_update"), command=self.cancel_update,
+                                        fill=INPUT, hover_fill=CARD_HOVER, text_color=TEXT, width=190, height=42,
+                                        background=PANEL)
+        self.cancel_button.pack_forget()
         self._auth_footer()
         self._enable_feedback_tree(self.root)
 
@@ -1116,8 +1120,8 @@ class QuestCompleterApp:
         self.update_button.pack_forget()
         self.update_size_label.pack(pady=(0, 7))
         self.update_progress_area.pack(fill="x", pady=(0, 4))
-        self.update_button.pack(pady=6)
-        self.update_button.configure(state="normal", text=self.tr("cancel_update"), command=self.cancel_update)
+        self.cancel_button.pack(pady=6)
+        self.cancel_button.configure(state="normal")
         self.update_status.configure(text=self.tr("downloading_update"))
         threading.Thread(target=self._download_update_worker, daemon=True, name="sb3-update-download").start()
 
@@ -1125,7 +1129,7 @@ class QuestCompleterApp:
         if not self.auth_busy:
             return
         self.update_cancel_event.set()
-        self.update_button.configure(state="disabled")
+        self.cancel_button.configure(state="disabled")
         self.update_status.configure(text=self.tr("update_cancelled"))
 
     def _download_update_worker(self) -> None:
@@ -1197,11 +1201,15 @@ class QuestCompleterApp:
         self.auth_busy = False
         self.update_temp_path = None
         self.update_progress_area.pack_forget()
+        self.cancel_button.pack_forget()
+        self.update_button.pack(pady=6)
         self.update_button.configure(state="normal", text=self.tr("update_button"), command=self.install_latest_update)
         self.update_status.configure(text=self.tr("update_cancelled"))
 
     def _update_failed(self) -> None:
         self.auth_busy = False
+        self.cancel_button.pack_forget()
+        self.update_button.pack(pady=6)
         self.update_button.configure(state="normal", text=self.tr("update_button"), command=self.install_latest_update)
         self.update_status.configure(text=self.tr("update_error"))
 
