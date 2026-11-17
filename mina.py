@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.4.7"
+VERSION = "0.4.8"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1035,7 +1035,19 @@ class QuestCompleterApp:
             else:
                 command = [sys.executable, str(Path(sys.argv[0]).resolve()), *sys.argv[1:]]
                 cwd = str(Path(sys.argv[0]).resolve().parent)
-            subprocess.Popen(command, cwd=cwd, close_fds=False)
+            child_env = os.environ.copy()
+            # PyInstaller one-file bootloaders must not inherit the old _MEIPASS
+            # extraction directory after the current process exits.
+            child_env.pop("_MEIPASS2", None)
+            child_env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+            if os.name == "nt":
+                command_line = subprocess.list2cmdline(command)
+                restart_script = f'timeout /t 2 /nobreak >nul & start "" {command_line}'
+                flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                subprocess.Popen(["cmd.exe", "/d", "/c", restart_script], cwd=cwd,
+                                 env=child_env, close_fds=False, creationflags=flags)
+            else:
+                subprocess.Popen(command, cwd=cwd, env=child_env, close_fds=False)
         except OSError:
             self.auth_busy = False
             self.build_membership_screen(error=True)
