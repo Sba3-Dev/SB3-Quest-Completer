@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -100,7 +100,7 @@ UI_TEXT = {
         "already_queue": "● Game is already in the queue", "added": "● Added: {name}",
         "stopped_tasks": "● Stopped {count} active task(s)",
         "support_title": "Sba3 Dev Support", "support_message": "Join our Discord server for support and updates.",
-        "join_support": "Join Discord server",
+        "join_support": "Join Discord server", "logout": "Sign out",
         "auth_subtitle": "Discord access required", "login_title": "Sign in with Discord",
         "login_message": "Sign in with your Discord account to continue.", "login_button": "Sign in with Discord",
         "checking_session": "Checking saved Discord session...", "checking_updates": "Checking for updates...",
@@ -133,7 +133,7 @@ UI_TEXT = {
         "already_queue": "● اللعبة موجودة في قائمة المهام", "added": "● تمت الإضافة: {name}",
         "stopped_tasks": "● تم إيقاف {count} من المهام النشطة",
         "support_title": "دعم Sba3 Dev", "support_message": "انضم إلى سيرفر Discord للدعم والحصول على آخر التحديثات.",
-        "join_support": "انضم إلى سيرفر Discord",
+        "join_support": "انضم إلى سيرفر Discord", "logout": "تسجيل الخروج",
         "auth_subtitle": "تسجيل الدخول عبر Discord", "login_title": "تسجيل الدخول عبر Discord",
         "login_message": "سجّل دخولك بحساب Discord للمتابعة إلى الأداة.", "login_button": "تسجيل الدخول عبر Discord",
         "checking_session": "جارٍ فحص جلسة Discord المحفوظة...", "checking_updates": "جارٍ فحص التحديثات...",
@@ -430,7 +430,8 @@ def check_saved_discord_session() -> tuple[bool, str]:
     except Exception:
         return False, "network"
     if result.get("ok") and result.get("member"):
-        save_discord_session({"refresh_token": result.get("refresh_token", refresh_token), "guild_id": DISCORD_GUILD_ID})
+        save_discord_session({"refresh_token": result.get("refresh_token", refresh_token), "guild_id": DISCORD_GUILD_ID,
+                              "user": result.get("user") or session.get("user") or {}})
         return True, "ok"
     return False, str(result.get("error") or "invalid_session")
 
@@ -503,7 +504,8 @@ def discord_login() -> tuple[bool, str]:
     except Exception:
         return False, "network"
     if result.get("ok") and result.get("member") and result.get("refresh_token"):
-        save_discord_session({"refresh_token": result["refresh_token"], "guild_id": DISCORD_GUILD_ID})
+        save_discord_session({"refresh_token": result["refresh_token"], "guild_id": DISCORD_GUILD_ID,
+                              "user": result.get("user") or {}})
         return True, "ok"
     return False, str(result.get("error") or "not_in_guild")
 
@@ -1152,6 +1154,7 @@ class QuestCompleterApp:
     def build_ui(self) -> None:
         header = tk.Frame(self.root, bg=BG)
         header.pack(fill="x", padx=30, pady=(22, 15))
+        self.build_account_widget(header)
         # شعار ثابت وواضح يسار اسم التطبيق في رأس النافذة.
         logo_slot = tk.Frame(header, width=46, height=46, bg=BG)
         logo_slot.pack(side="left", padx=(0, 13))
@@ -1182,14 +1185,97 @@ class QuestCompleterApp:
         footer.pack(fill="x", padx=30, pady=(0, 16))
         self.status = tk.Label(footer, text=self.tr("ready"), bg=BG, fg=MUTED, font=("Segoe UI", 9, "bold"), anchor="w")
         self.status.pack(side="left")
-        support_button = PillButton(footer, text="🎧", command=self.open_support_panel, fill=INPUT,
-                                    hover_fill=CARD_HOVER, text_color=TEXT_DIM, font=("Segoe UI Emoji", 14),
-                                    width=42, height=34, background=BG)
-        support_button.pack(side="right")
-        settings_button = PillButton(footer, text="⚙", command=self.open_settings_panel, fill=INPUT,
-                                     hover_fill=CARD_HOVER, text_color=TEXT_DIM, font=("Segoe UI Symbol", 15),
-                                     width=38, height=34, background=BG)
-        settings_button.pack(side="right", padx=(0, 7))
+
+    def build_account_widget(self, parent: tk.Frame) -> None:
+        account = tk.Frame(parent, bg=BG)
+        account.pack(side="left", padx=(0, 18))
+        self.account_avatar = tk.Label(account, text="?", bg=CARD, fg=TEXT,
+                                       font=("Segoe UI", 16, "bold"), width=4, height=2, cursor="hand2")
+        self.account_avatar.pack(side="left")
+        self.account_avatar.bind("<Button-1>", lambda _event: self.toggle_account_menu())
+        user_info = load_discord_session().get("user") or {}
+        username = str(user_info.get("global_name") or user_info.get("username") or "Discord user")
+        self.account_name = tk.Label(account, text=username, bg=BG, fg=TEXT_DIM,
+                                     font=("Segoe UI", 9, "bold"), cursor="hand2")
+        self.account_name.pack(side="left", padx=(8, 0))
+        self.account_name.bind("<Button-1>", lambda _event: self.toggle_account_menu())
+        self.account_avatar_image = None
+        self.load_account_avatar(user_info)
+
+    def load_account_avatar(self, user: dict[str, Any]) -> None:
+        user_id = str(user.get("id") or "")
+        avatar_hash = str(user.get("avatar") or "")
+        if not requests or not user_id:
+            return
+        if avatar_hash:
+            url = f"https://cdn.discordapp.com/avatars/{user_id}/{avatar_hash}.png?size=128"
+        else:
+            try:
+                url = f"https://cdn.discordapp.com/embed/avatars/{int(user_id) % 5}.png"
+            except ValueError:
+                return
+
+        def worker() -> None:
+            try:
+                response = requests.get(url, headers=HEADERS, timeout=(5, 15))
+                response.raise_for_status()
+                raw = response.content
+                self.root.after(0, self._apply_account_avatar, raw)
+            except Exception:
+                pass
+        threading.Thread(target=worker, daemon=True, name="sb3-account-avatar").start()
+
+    def _apply_account_avatar(self, raw: bytes) -> None:
+        if not (Image and ImageDraw and ImageOps and ImageTk):
+            return
+        try:
+            image = Image.open(io.BytesIO(raw)).convert("RGBA")
+            image = ImageOps.fit(image, (58, 58), Image.Resampling.LANCZOS)
+            mask = Image.new("L", (58, 58), 0)
+            ImageDraw.Draw(mask).ellipse((0, 0, 57, 57), fill=255)
+            image.putalpha(mask)
+            self.account_avatar_image = ImageTk.PhotoImage(image)
+            self.account_avatar.configure(image=self.account_avatar_image, text="")
+        except (OSError, tk.TclError):
+            pass
+
+    def toggle_account_menu(self) -> None:
+        if getattr(self, "account_menu", None) and self.account_menu.winfo_exists():
+            self.account_menu.destroy()
+            self.account_menu = None
+            return
+        self.root.update_idletasks()
+        menu = tk.Toplevel(self.root)
+        menu.overrideredirect(True)
+        menu.configure(bg=PANEL)
+        menu.attributes("-topmost", True)
+        x = self.account_avatar.winfo_rootx() + self.account_avatar.winfo_width() + 8
+        y = self.account_avatar.winfo_rooty()
+        menu.geometry(f"190x156+{x}+{y}")
+        self.account_menu = menu
+        surface = RoundedSurface(menu, fill=PANEL, radius=16, width=190, height=156, background=PANEL)
+        surface.pack(fill="both", expand=True)
+        content = surface.content
+        for label, command in ((self.tr("settings"), self.open_settings_panel),
+                               (self.tr("support"), self.open_support_panel),
+                               (self.tr("logout"), self.logout)):
+            button = PillButton(content, text=label, command=lambda action=command: self._account_action(action),
+                                fill=CARD, hover_fill=CARD_HOVER, text_color=TEXT, width=150, height=32,
+                                background=PANEL)
+            button.pack(pady=3)
+
+    def _account_action(self, action: Callable[[], None]) -> None:
+        if getattr(self, "account_menu", None) and self.account_menu.winfo_exists():
+            self.account_menu.destroy()
+            self.account_menu = None
+        action()
+
+    def logout(self) -> None:
+        self.membership_watch_active = False
+        self.stop_all_simulations()
+        clear_discord_session()
+        self.auth_busy = False
+        self.build_login_screen(self.tr("login_message"))
 
     def load_logo(self, target: tk.Label) -> None:
         path = resource_path("logo.ico")
