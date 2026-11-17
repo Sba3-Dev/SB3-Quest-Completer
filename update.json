@@ -1,6 +1,6 @@
 {
-  "sha256": "2ed4d146166cd356e9c70a60d0238fd4a8e8cfc1bcd2781d3c4c7e53f246e6fd",
-  "installer_url": "https://github.com/awas123456awas-png/-SB3-Quest-Completer/releases/download/v0.1.7/SB3QuestCompleter-Setup.exe",
-  "version": "0.1.7",
-  "size": 25796898
+  "version": "0.1.8",
+  "installer_url": "https://github.com/awas123456awas-png/-SB3-Quest-Completer/releases/download/v0.1.8/SB3QuestCompleter-Setup.exe",
+  "size": 25798783,
+  "sha256": "b7dd1120e152c016e43c39decd328bb3238c8e7078e8eba3deaac150756c890c"
 }
