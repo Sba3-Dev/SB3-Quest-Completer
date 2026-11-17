@@ -40,7 +40,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.0.6"
+VERSION = "0.0.7"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -748,6 +748,123 @@ class QuestCompleterApp:
         self.queue_canvas: tk.Canvas | None = None
         self.local_game_paths = self.load_local_game_paths()
         self.featured_ranks = self.load_featured_ranks()
+        self.auth_busy = False
+        self.latest_manifest: dict[str, Any] | None = None
+        self.root.after(100, self.start_auth_gate)
+
+    def _clear_root(self) -> None:
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+    def _auth_header(self, subtitle: str) -> None:
+        header = tk.Frame(self.root, bg=BG)
+        header.pack(fill="x", padx=30, pady=(22, 15))
+        logo_slot = tk.Frame(header, width=46, height=46, bg=BG)
+        logo_slot.pack(side="left", padx=(0, 13))
+        logo_slot.pack_propagate(False)
+        logo = tk.Label(logo_slot, bg=BG)
+        logo.pack(fill="both", expand=True)
+        self.load_logo(logo)
+        labels = tk.Frame(header, bg=BG)
+        labels.pack(side="left", fill="x", expand=True)
+        tk.Label(labels, text=APP_NAME, bg=BG, fg=TEXT, font=("Segoe UI", 19, "bold")).pack(anchor="w")
+        tk.Label(labels, text=subtitle, bg=BG, fg=TEXT_DIM, font=("Segoe UI", 9)).pack(anchor="w", pady=(3, 0))
+
+    def build_login_screen(self, note: str = "") -> None:
+        self._clear_root()
+        self._auth_header("Discord access required")
+        surface = RoundedSurface(self.root, fill=PANEL, radius=24, width=520, height=420, background=BG)
+        surface.pack(fill="both", expand=True, padx=260, pady=(35, 75))
+        content = surface.content
+        self._add_panel_logo(content, 92)
+        tk.Label(content, text="تسجيل الدخول عبر Discord", bg=PANEL, fg=TEXT,
+                 font=("Segoe UI", 14, "bold")).pack(pady=(0, 9))
+        tk.Label(content, text="سجّل دخولك بحساب Discord للمتابعة إلى الأداة.", bg=PANEL,
+                 fg=TEXT_DIM, font=("Segoe UI", 9), wraplength=350, justify="center").pack(pady=(0, 18))
+        self.auth_note = tk.Label(content, text=note, bg=PANEL, fg=RED_HOVER,
+                                  font=("Segoe UI", 9), wraplength=350, justify="center")
+        self.auth_note.pack(pady=(0, 12))
+        self.auth_button = PillButton(content, text="تسجيل الدخول عبر Discord", command=self.start_discord_login,
+                                      fill=RED, hover_fill=RED_HOVER, width=250, height=42, background=PANEL)
+        self.auth_button.pack(pady=6)
+        self._enable_feedback_tree(self.root)
+
+    def build_membership_screen(self, error: bool = False) -> None:
+        self._clear_root()
+        self._auth_header("Discord server access")
+        surface = RoundedSurface(self.root, fill=PANEL, radius=24, width=520, height=420, background=BG)
+        surface.pack(fill="both", expand=True, padx=260, pady=(35, 75))
+        content = surface.content
+        self._add_panel_logo(content, 92)
+        tk.Label(content, text="لاستخدام الأداة يجب عليك الانضمام إلى سيرفر SB3", bg=PANEL,
+                 fg=TEXT, font=("Segoe UI", 13, "bold"), wraplength=355, justify="center").pack(pady=(0, 12))
+        if error:
+            tk.Label(content, text="حدث خطاء في الانضمام، يرجى المحاولة مرة اخرى", bg=PANEL,
+                     fg=RED_HOVER, font=("Segoe UI", 9), wraplength=350, justify="center").pack(pady=(0, 12))
+        else:
+            tk.Label(content, text="اضغط الزر، انضم إلى السيرفر، ثم ارجع إلى الأداة.", bg=PANEL,
+                     fg=TEXT_DIM, font=("Segoe UI", 9), wraplength=350, justify="center").pack(pady=(0, 12))
+        self.auth_button = PillButton(content, text="انضمام إلى السيرفر", command=self.join_and_recheck,
+                                      fill=RED, hover_fill=RED_HOVER, width=220, height=42, background=PANEL)
+        self.auth_button.pack(pady=6)
+        self._enable_feedback_tree(self.root)
+
+    def start_auth_gate(self) -> None:
+        self.build_login_screen("جارٍ فحص جلسة Discord المحفوظة...")
+        threading.Thread(target=self._auth_check_worker, daemon=True, name="sb3-auth-check").start()
+
+    def _auth_check_worker(self) -> None:
+        valid, reason = check_saved_discord_session()
+        self.root.after(0, lambda: self._finish_auth_check(valid, reason))
+
+    def _finish_auth_check(self, valid: bool, reason: str) -> None:
+        if valid:
+            self.open_main_interface()
+        elif reason == "not_in_guild":
+            self.build_membership_screen()
+        else:
+            self.build_login_screen()
+
+    def start_discord_login(self) -> None:
+        if self.auth_busy:
+            return
+        self.auth_busy = True
+        self.build_login_screen("جارٍ فتح تسجيل الدخول عبر Discord...")
+        threading.Thread(target=self._login_worker, daemon=True, name="sb3-auth-login").start()
+
+    def _login_worker(self) -> None:
+        valid, reason = discord_login()
+        self.root.after(0, lambda: self._finish_auth_check(valid, reason))
+        self.auth_busy = False
+
+    def join_and_recheck(self) -> None:
+        if self.auth_busy:
+            return
+        self.auth_busy = True
+        webbrowser.open_new_tab(SUPPORT_DISCORD_URL)
+        self.build_membership_screen()
+        self.auth_button.configure(state="disabled")
+        threading.Thread(target=self._membership_worker, daemon=True, name="sb3-membership-check").start()
+
+    def _membership_worker(self) -> None:
+        time.sleep(2)
+        valid = False
+        for _ in range(30):
+            valid, _reason = check_saved_discord_session()
+            if valid:
+                break
+            time.sleep(2)
+        self.root.after(0, lambda: self._finish_membership_check(valid))
+
+    def _finish_membership_check(self, valid: bool) -> None:
+        self.auth_busy = False
+        if valid:
+            self.open_main_interface()
+        else:
+            self.build_membership_screen(error=True)
+
+    def open_main_interface(self) -> None:
+        self.auth_busy = False
         self.build_ui()
         self._enable_feedback_tree(self.root)
         self.start_monitor()
@@ -764,14 +881,12 @@ class QuestCompleterApp:
         return tuple(parts or [0])
 
     def check_for_required_update(self) -> None:
-        """Require the published installer when GitHub announces a newer version.
-
-        A temporary network failure does not lock out an already installed version.
-        Once a newer manifest is successfully read, declining or failing the update
-        closes the application so an old build cannot continue to be used.
-        """
+        """Show the latest available update in an in-app screen."""
         if not UPDATE_MANIFEST_URL or not requests:
             return
+        threading.Thread(target=self._update_check_worker, daemon=True, name="sb3-update-check").start()
+
+    def _update_check_worker(self) -> None:
         try:
             response = requests.get(UPDATE_MANIFEST_URL, headers=HEADERS, timeout=(5, 15))
             response.raise_for_status()
@@ -782,15 +897,46 @@ class QuestCompleterApp:
                 return
         except Exception:
             return
+        self.root.after(0, lambda: self.show_update_screen(manifest))
 
-        prompt = (
-            f"A mandatory update is available (v{latest}).\\n\\n"
-            "The application will close after the update is installed. Continue?"
-        )
-        if not messagebox.askyesno("Update required", prompt, parent=self.root):
-            self.root.destroy()
+    def show_update_screen(self, manifest: dict[str, Any]) -> None:
+        self.latest_manifest = manifest
+        latest = str(manifest.get("version", "")).strip()
+        self._clear_root()
+        self._auth_header("Application update")
+        surface = RoundedSurface(self.root, fill=PANEL, radius=24, width=520, height=420, background=BG)
+        surface.pack(fill="both", expand=True, padx=260, pady=(35, 75))
+        content = surface.content
+        self._add_panel_logo(content, 92)
+        tk.Label(content, text="يتوفر تحديث جديد", bg=PANEL, fg=TEXT,
+                 font=("Segoe UI", 14, "bold")).pack(pady=(0, 18))
+        versions = tk.Frame(content, bg=PANEL)
+        versions.pack(pady=(0, 18))
+        tk.Label(versions, text=f"النسخة الحالية: {VERSION}", bg=PANEL, fg=TEXT_DIM,
+                 font=("Segoe UI", 10)).pack()
+        tk.Label(versions, text=f"النسخة الجديدة: {latest}", bg=PANEL, fg=SUCCESS,
+                 font=("Segoe UI", 10, "bold")).pack(pady=(6, 0))
+        self.update_status = tk.Label(content, text="", bg=PANEL, fg=TEXT_DIM,
+                                      font=("Segoe UI", 9), wraplength=350, justify="center")
+        self.update_status.pack(pady=(0, 12))
+        self.update_button = PillButton(content, text="تحديث الآن", command=self.install_latest_update,
+                                        fill=RED, hover_fill=RED_HOVER, width=190, height=42, background=PANEL)
+        self.update_button.pack(pady=6)
+        self._enable_feedback_tree(self.root)
+
+    def install_latest_update(self) -> None:
+        if self.auth_busy or not self.latest_manifest:
             return
+        self.auth_busy = True
+        self.update_button.configure(state="disabled")
+        self.update_status.configure(text="جارٍ تنزيل التحديث...")
+        threading.Thread(target=self._download_update_worker, daemon=True, name="sb3-update-download").start()
+
+    def _download_update_worker(self) -> None:
+        manifest = self.latest_manifest or {}
         try:
+            installer_url = str(manifest["installer_url"])
+            latest = str(manifest["version"])
             download = requests.get(installer_url, headers=HEADERS, timeout=(10, 120), stream=True)
             download.raise_for_status()
             suffix = Path(installer_url.split("?", 1)[0]).suffix or ".exe"
@@ -803,12 +949,18 @@ class QuestCompleterApp:
             if expected_hash:
                 digest = hashlib.sha256(temp_path.read_bytes()).hexdigest().casefold()
                 if digest != expected_hash:
-                    raise ValueError("The downloaded update failed its SHA-256 check.")
-            os.startfile(str(temp_path)) if os.name == "nt" else subprocess.Popen([str(temp_path)])
-            self.root.destroy()
-        except Exception as exc:
-            messagebox.showerror("Update failed", f"The required update could not be installed.\\n\\n{exc}", parent=self.root)
-            self.root.destroy()
+                    raise ValueError("update checksum mismatch")
+            if os.name != "nt":
+                raise RuntimeError("Windows installer can only run on Windows")
+            os.startfile(str(temp_path))
+            self.root.after(0, self.root.destroy)
+        except Exception:
+            self.root.after(0, lambda: self._update_failed())
+
+    def _update_failed(self) -> None:
+        self.auth_busy = False
+        self.update_button.configure(state="normal")
+        self.update_status.configure(text="حدث خطأ في التحديث، يرجى المحاولة مرة أخرى")
 
     # ---- Visual system ----
     def _enable_button_feedback(self, button: tk.Button) -> None:
@@ -1767,11 +1919,6 @@ def main() -> None:
         return
 
     root = tk.Tk()
-    root.withdraw()
-    if not ensure_discord_access(root):
-        root.destroy()
-        return
-    root.deiconify()
     QuestCompleterApp(root)
     root.mainloop()
 
