@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.2.7"
+VERSION = "0.2.8"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -437,6 +437,10 @@ def check_saved_discord_session() -> tuple[bool, str]:
         save_discord_session({"refresh_token": result.get("refresh_token", refresh_token), "guild_id": DISCORD_GUILD_ID,
                               "user": result.get("user") or session.get("user") or {}})
         return True, "ok"
+    rotated_token = str(result.get("refresh_token") or "")
+    if rotated_token:
+        save_discord_session({"refresh_token": rotated_token, "guild_id": DISCORD_GUILD_ID,
+                              "user": result.get("user") or session.get("user") or {}})
     return False, str(result.get("error") or "invalid_session")
 
 
@@ -476,7 +480,7 @@ def discord_login() -> tuple[bool, str]:
             .logo{{width:88px;height:88px;object-fit:contain;margin-bottom:18px}}.logo-fallback{{font-size:32px;font-weight:700;color:#a7474d;margin-bottom:18px}}
             h1{{font-size:20px;margin:0 0 12px}}p{{color:#ccb8bc;font-size:14px;margin:0 0 24px}}button{{border:0;border-radius:12px;padding:13px 24px;background:#a7474d;color:white;font-size:14px;cursor:pointer}}button:hover{{background:#b9585e}}</style></head>
             <body><main class="card">{icon_html}<h1>{title}</h1><p>{message}</p><button onclick="closeAndReturn()">{button}</button></main>
-            <script>function closeAndReturn(){{window.close();try{{window.open('', '_self');window.close();}}catch(e){{}}}}
+            <script>function closeAndReturn(){{try{{window.open('', '_self', '');}}catch(e){{}}try{{window.close();}}catch(e){{}}setTimeout(function(){{try{{window.open('', '_self');window.close();}}catch(e){{}}}},120);}}
             setTimeout(closeAndReturn, 650);</script></body></html>'''.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -1359,9 +1363,9 @@ class QuestCompleterApp:
             ImageDraw.Draw(mask).ellipse((0, 0, 33, 33), fill=255)
             image.putalpha(mask)
             self.account_avatar_image = ImageTk.PhotoImage(image, master=self.root)
-            thumb = ImageOps.fit(image.convert("RGBA"), (20, 20), Image.Resampling.LANCZOS)
-            thumb_mask = Image.new("L", (20, 20), 0)
-            ImageDraw.Draw(thumb_mask).ellipse((0, 0, 19, 19), fill=255)
+            thumb = ImageOps.fit(image.convert("RGBA"), (34, 34), Image.Resampling.LANCZOS)
+            thumb_mask = Image.new("L", (34, 34), 0)
+            ImageDraw.Draw(thumb_mask).ellipse((0, 0, 33, 33), fill=255)
             thumb.putalpha(thumb_mask)
             self.account_avatar_thumb_image = ImageTk.PhotoImage(thumb, master=self.root)
             self.account_avatar.itemconfigure(self.account_avatar_item, image=self.account_avatar_image, state="normal")
@@ -1389,16 +1393,16 @@ class QuestCompleterApp:
         surface.pack(fill="both", expand=True)
         content = surface.content
         user_info = load_discord_session().get("user") or {}
-        top = tk.Frame(content, bg=PANEL, height=28)
+        top = tk.Frame(content, bg=PANEL, height=40)
         top.pack(fill="x", padx=12, pady=(12, 8))
         top.pack_propagate(False)
-        popup_avatar = tk.Canvas(top, width=20, height=20, bg=PANEL, highlightthickness=0, bd=0)
+        popup_avatar = tk.Canvas(top, width=34, height=34, bg=PANEL, highlightthickness=0, bd=0)
         popup_avatar.pack(side="left")
         self.account_popup_avatar = popup_avatar
-        self.account_popup_image_item = popup_avatar.create_image(10, 10, anchor="center", image="")
+        self.account_popup_image_item = popup_avatar.create_image(17, 17, anchor="center", image="")
         self.account_popup_fallback = popup_avatar.create_text(
-            10, 10, text=self._avatar_initials(user_info), fill=TEXT,
-            font=("Segoe UI", 7, "bold"), anchor="center"
+            17, 17, text=self._avatar_initials(user_info), fill=TEXT,
+            font=("Segoe UI", 9, "bold"), anchor="center"
         )
         if getattr(self, "account_avatar_thumb_image", None):
             popup_avatar.itemconfigure(self.account_popup_image_item, image=self.account_avatar_thumb_image, state="normal")
