@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -107,7 +107,7 @@ UI_TEXT = {
         "join_support": "Join Discord server", "logout": "Sign out",
         "auth_subtitle": "Discord access required", "login_title": "Sign in with Discord",
         "login_message": "Sign in with your Discord account to continue.", "login_button": "Sign in with Discord",
-        "checking_session": "Checking saved Discord session...", "checking_updates": "Checking for updates...", "human_check_failed": "Cloudflare verification failed. Please try again.",
+        "checking_session": "Checking saved Discord session...", "checking_updates": "Checking for updates...", "verify_human": "Verify you are human", "human_check_failed": "Cloudflare verification failed. Please try again.",
         "membership_subtitle": "Discord server access", "membership_title": "To use the app, join the SB3 server",
         "membership_message": "Click the button, join the server, then return to the app.",
         "membership_error": "There was an error joining. Please try again.", "join_button": "Join the server", "refresh_membership": "Refresh",
@@ -142,7 +142,7 @@ UI_TEXT = {
         "join_support": "انضم إلى سيرفر Discord", "logout": "تسجيل الخروج",
         "auth_subtitle": "تسجيل الدخول عبر Discord", "login_title": "تسجيل الدخول عبر Discord",
         "login_message": "سجّل دخولك بحساب Discord للمتابعة إلى الأداة.", "login_button": "تسجيل الدخول عبر Discord",
-        "checking_session": "جارٍ فحص جلسة Discord المحفوظة...", "checking_updates": "جارٍ فحص التحديثات...", "human_check_failed": "فشل تحقق Cloudflare، يرجى المحاولة مرة أخرى.",
+        "checking_session": "جارٍ فحص جلسة Discord المحفوظة...", "checking_updates": "جارٍ فحص التحديثات...", "verify_human": "تحقق من أنك إنسان", "human_check_failed": "فشل تحقق Cloudflare، يرجى المحاولة مرة أخرى.",
         "membership_subtitle": "الوصول إلى سيرفر Discord", "membership_title": "لاستخدام الأداة يجب عليك الانضمام إلى سيرفر SB3",
         "membership_message": "اضغط الزر، انضم إلى السيرفر، ثم ارجع إلى الأداة.",
         "membership_error": "حدث خطأ في الانضمام، يرجى المحاولة مرة أخرى.", "join_button": "انضمام إلى السيرفر", "refresh_membership": "تحديث",
@@ -971,12 +971,29 @@ class QuestCompleterApp:
         self._auth_footer()
         self._enable_feedback_tree(self.root)
 
-    def build_splash_screen(self) -> None:
+    def build_splash_screen(self, error: bool = False) -> None:
         self._clear_root()
         self.auth_screen = "splash"
         self.splash_angle = 0
         self.splash_panel = tk.Frame(self.root, bg=BG)
         self.splash_panel.pack(fill="both", expand=True)
+        center = tk.Frame(self.splash_panel, bg=BG)
+        center.place(relx=0.5, rely=0.5, anchor="center")
+        self._add_panel_logo(center, 180)
+        tk.Label(center, text="Welcom To SB3 Tool", bg=BG, fg=TEXT,
+                 font=("Segoe UI", 20, "bold")).pack(pady=(8, 24))
+        if error:
+            tk.Label(center, text=self.tr("human_check_failed"), bg=BG, fg=RED_HOVER,
+                     font=("Segoe UI", 9), wraplength=300, justify="center").pack(pady=(0, 12))
+        self.turnstile_button = PillButton(center, text=self.tr("verify_human"),
+                                           command=self.start_turnstile_verification,
+                                           fill=RED, hover_fill=RED_HOVER, width=250, height=44,
+                                           background=BG)
+        self.turnstile_button.pack(pady=(4, 0))
+
+    def _show_splash_loader(self) -> None:
+        for widget in self.splash_panel.winfo_children():
+            widget.destroy()
         center = tk.Frame(self.splash_panel, bg=BG)
         center.place(relx=0.5, rely=0.5, anchor="center")
         self._add_panel_logo(center, 180)
@@ -1008,19 +1025,30 @@ class QuestCompleterApp:
 
     def start_startup_gate(self) -> None:
         """Check the update manifest before showing Discord login."""
-        self.auth_busy = True
+        self.auth_busy = False
         self.build_splash_screen()
+
+    def start_turnstile_verification(self) -> None:
+        if self.auth_busy:
+            return
+        self.auth_busy = True
+        current_language = getattr(self, "appearance_settings", {}).get("language", "en")
+        self.turnstile_button.configure(state="disabled", text="Verifying..." if current_language == "en" else "جارٍ التحقق...")
         threading.Thread(target=self._startup_security_worker, daemon=True, name="sb3-startup-turnstile").start()
 
     def _startup_security_worker(self) -> None:
         if not turnstile_check():
             self.root.after(0, self._turnstile_failed)
             return
+        self.root.after(0, self._turnstile_passed)
+
+    def _turnstile_passed(self) -> None:
+        self._show_splash_loader()
         threading.Thread(target=self._startup_update_worker, daemon=True, name="sb3-startup-update").start()
 
     def _turnstile_failed(self) -> None:
-        messagebox.showerror("Cloudflare", self.tr("human_check_failed"), parent=self.root)
-        self.start_startup_gate()
+        self.auth_busy = False
+        self.build_splash_screen(error=True)
 
     def _startup_update_worker(self) -> None:
         if not UPDATE_MANIFEST_URL or not requests:
