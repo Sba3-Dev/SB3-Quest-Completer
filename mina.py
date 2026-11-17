@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -112,6 +112,7 @@ UI_TEXT = {
         "update_button": "Update now", "downloading_update": "Downloading update...",
         "update_error": "There was an error updating. Please try again.", "download_speed": "Speed: {speed}/s",
         "time_remaining": "Time remaining: {time}", "launching_update": "Launching the installer...",
+        "installer_size": "Installer size: {size}",
     },
     "ar": {
         "settings": "الإعدادات", "settings_title": "الإعدادات", "settings_note": "تُحفظ التغييرات محليًا وتُطبّق فورًا.",
@@ -145,6 +146,7 @@ UI_TEXT = {
         "update_button": "تحديث الآن", "downloading_update": "جارٍ تنزيل التحديث...",
         "update_error": "حدث خطأ في التحديث، يرجى المحاولة مرة أخرى.", "download_speed": "السرعة: {speed}/ث",
         "time_remaining": "الوقت المتبقي: {time}", "launching_update": "جارٍ تشغيل المثبت...",
+        "installer_size": "حجم التثبيت: {size}",
     },
 }
 
@@ -1008,7 +1010,16 @@ class QuestCompleterApp:
         self.update_status = tk.Label(content, text="", bg=PANEL, fg=TEXT_DIM,
                                       font=("Segoe UI", 9), wraplength=350, justify="center")
         self.update_status.pack(pady=(0, 12))
-        progress_row = tk.Frame(content, bg=PANEL)
+        size_value = manifest.get("size")
+        try:
+            size_text = self._format_download_size(float(size_value)) if size_value else "--"
+        except (TypeError, ValueError):
+            size_text = "--"
+        self.update_size_label = tk.Label(content, text=self.tr("installer_size", size=size_text), bg=PANEL, fg=TEXT_DIM,
+                                          font=("Segoe UI", 9))
+        self.update_size_label.pack(pady=(0, 10))
+        self.update_progress_area = tk.Frame(content, bg=PANEL)
+        progress_row = tk.Frame(self.update_progress_area, bg=PANEL)
         progress_row.pack(fill="x", padx=34, pady=(0, 4))
         self.update_percent_label = tk.Label(progress_row, text="0%", bg=PANEL, fg=TEXT_DIM,
                                              font=("Segoe UI", 9, "bold"))
@@ -1016,11 +1027,11 @@ class QuestCompleterApp:
         self.update_total_label = tk.Label(progress_row, text="%100", bg=PANEL, fg=MUTED,
                                            font=("Segoe UI", 9, "bold"))
         self.update_total_label.pack(side="right")
-        self.update_progress_canvas = tk.Canvas(content, bg=INPUT, highlightthickness=0, bd=0,
+        self.update_progress_canvas = tk.Canvas(self.update_progress_area, bg=INPUT, highlightthickness=0, bd=0,
                                                 width=360, height=12)
         self.update_progress_canvas.pack(fill="x", padx=34, pady=(0, 9))
         self.update_progress_fill = self.update_progress_canvas.create_rectangle(0, 0, 0, 12, fill=RED, outline="")
-        self.update_stats_label = tk.Label(content, text="", bg=PANEL, fg=MUTED,
+        self.update_stats_label = tk.Label(self.update_progress_area, text="", bg=PANEL, fg=MUTED,
                                            font=("Segoe UI", 8), wraplength=350, justify="center")
         self.update_stats_label.pack(pady=(0, 7))
         self.update_button = PillButton(content, text=self.tr("update_button"), command=self.install_latest_update,
@@ -1048,7 +1059,8 @@ class QuestCompleterApp:
     def _render_download_progress(self, received: int, total: int, speed: float, eta: float | None) -> None:
         try:
             ratio = min(1.0, max(0.0, received / total)) if total else 0.0
-            self.update_progress_canvas.coords(self.update_progress_fill, 0, 0, 360 * ratio, 12)
+            bar_width = max(1, self.update_progress_canvas.winfo_width())
+            self.update_progress_canvas.coords(self.update_progress_fill, 0, 0, bar_width * ratio, 12)
             self.update_percent_label.configure(text=f"{int(ratio * 100)}%")
             speed_text = self._format_download_size(speed)
             eta_text = self._format_download_time(eta)
@@ -1060,6 +1072,11 @@ class QuestCompleterApp:
         if self.auth_busy or not self.latest_manifest:
             return
         self.auth_busy = True
+        self.update_size_label.pack_forget()
+        self.update_button.pack_forget()
+        self.update_size_label.pack(pady=(0, 7))
+        self.update_progress_area.pack(fill="x", pady=(0, 4))
+        self.update_button.pack(pady=6)
         self.update_button.configure(state="disabled")
         self.update_status.configure(text=self.tr("downloading_update"))
         threading.Thread(target=self._download_update_worker, daemon=True, name="sb3-update-download").start()
@@ -1188,17 +1205,12 @@ class QuestCompleterApp:
 
     def build_account_widget(self, parent: tk.Frame) -> None:
         account = tk.Frame(parent, bg=BG)
-        account.pack(side="left", padx=(0, 18))
+        account.pack(side="right", padx=(18, 0))
         self.account_avatar = tk.Label(account, text="?", bg=CARD, fg=TEXT,
-                                       font=("Segoe UI", 16, "bold"), width=4, height=2, cursor="hand2")
+                                       font=("Segoe UI", 18, "bold"), width=4, height=2, cursor="hand2")
         self.account_avatar.pack(side="left")
         self.account_avatar.bind("<Button-1>", lambda _event: self.toggle_account_menu())
         user_info = load_discord_session().get("user") or {}
-        username = str(user_info.get("global_name") or user_info.get("username") or "Discord user")
-        self.account_name = tk.Label(account, text=username, bg=BG, fg=TEXT_DIM,
-                                     font=("Segoe UI", 9, "bold"), cursor="hand2")
-        self.account_name.pack(side="left", padx=(8, 0))
-        self.account_name.bind("<Button-1>", lambda _event: self.toggle_account_menu())
         self.account_avatar_image = None
         self.load_account_avatar(user_info)
 
@@ -1230,9 +1242,9 @@ class QuestCompleterApp:
             return
         try:
             image = Image.open(io.BytesIO(raw)).convert("RGBA")
-            image = ImageOps.fit(image, (58, 58), Image.Resampling.LANCZOS)
-            mask = Image.new("L", (58, 58), 0)
-            ImageDraw.Draw(mask).ellipse((0, 0, 57, 57), fill=255)
+            image = ImageOps.fit(image, (72, 72), Image.Resampling.LANCZOS)
+            mask = Image.new("L", (72, 72), 0)
+            ImageDraw.Draw(mask).ellipse((0, 0, 71, 71), fill=255)
             image.putalpha(mask)
             self.account_avatar_image = ImageTk.PhotoImage(image)
             self.account_avatar.configure(image=self.account_avatar_image, text="")
@@ -1245,22 +1257,30 @@ class QuestCompleterApp:
             self.account_menu = None
             return
         self.root.update_idletasks()
-        menu = tk.Toplevel(self.root)
-        menu.overrideredirect(True)
-        menu.configure(bg=PANEL)
-        menu.attributes("-topmost", True)
-        x = self.account_avatar.winfo_rootx() + self.account_avatar.winfo_width() + 8
-        y = self.account_avatar.winfo_rooty()
-        menu.geometry(f"190x156+{x}+{y}")
+        menu = tk.Frame(self.root, bg=PANEL, highlightthickness=1, highlightbackground=BORDER)
+        x = max(8, self.account_avatar.winfo_rootx() - self.root.winfo_rootx() - 142)
+        y = self.account_avatar.winfo_rooty() - self.root.winfo_rooty() + self.account_avatar.winfo_height() + 8
+        menu.place(x=x, y=y, width=220, height=205)
+        menu.lift()
         self.account_menu = menu
-        surface = RoundedSurface(menu, fill=PANEL, radius=16, width=190, height=156, background=PANEL)
+        surface = RoundedSurface(menu, fill=PANEL, radius=16, width=220, height=205, background=PANEL)
         surface.pack(fill="both", expand=True)
         content = surface.content
+        user_info = load_discord_session().get("user") or {}
+        top = tk.Frame(content, bg=PANEL)
+        top.pack(fill="x", padx=12, pady=(12, 8))
+        popup_avatar = tk.Label(top, bg=CARD, fg=TEXT, font=("Segoe UI", 12, "bold"), width=3, height=1)
+        popup_avatar.pack(side="left")
+        if self.account_avatar_image:
+            popup_avatar.configure(image=self.account_avatar_image)
+        username = str(user_info.get("global_name") or user_info.get("username") or "Discord user")
+        tk.Label(top, text=username, bg=PANEL, fg=TEXT, font=("Segoe UI", 9, "bold"),
+                 anchor="w").pack(side="left", fill="x", expand=True, padx=(9, 0))
         for label, command in ((self.tr("settings"), self.open_settings_panel),
                                (self.tr("support"), self.open_support_panel),
                                (self.tr("logout"), self.logout)):
             button = PillButton(content, text=label, command=lambda action=command: self._account_action(action),
-                                fill=CARD, hover_fill=CARD_HOVER, text_color=TEXT, width=150, height=32,
+                                fill=CARD, hover_fill=CARD_HOVER, text_color=TEXT, width=176, height=32,
                                 background=PANEL)
             button.pack(pady=3)
 
@@ -1379,9 +1399,9 @@ class QuestCompleterApp:
     def build_library(self) -> None:
         top = tk.Frame(self.library_panel, bg=PANEL)
         top.pack(fill="x", padx=22, pady=(20, 10))
-        tk.Label(top, text=self.tr("featured_games"), bg=PANEL, fg=TEXT, font=("Segoe UI", 12, "bold")).pack(side="left")
+        tk.Label(top, text=self.tr("featured_games"), bg=PANEL, fg=TEXT, font=("Segoe UI", 12, "bold")).pack(side="right")
         self.results = tk.Label(top, text=self.tr("preparing_library"), bg=PANEL, fg=MUTED, font=("Segoe UI", 9))
-        self.results.pack(side="right")
+        self.results.pack(side="left")
         self.search_var = tk.StringVar()
         self.search_var.trace_add("write", self._on_search_change)
         search_surface = RoundedSurface(self.library_panel, fill=INPUT, radius=14, width=580, height=56, background=PANEL)
@@ -1615,6 +1635,8 @@ class QuestCompleterApp:
             self.appearance_settings["language"] = language
         self.save_appearance_settings()
         self._apply_appearance_palette()
+        if self.auth_screen == "update" and self.auth_busy:
+            return
         self._rebuild_interface()
 
     def _rebuild_interface(self) -> None:

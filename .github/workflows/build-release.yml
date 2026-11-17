@@ -72,10 +72,12 @@ jobs:
         run: |
           $version = $env:RELEASE_TAG.TrimStart('v')
           $hash = (Get-FileHash "installer-output/SB3QuestCompleter-Setup.exe" -Algorithm SHA256).Hash.ToLower()
+          $size = (Get-Item "installer-output/SB3QuestCompleter-Setup.exe").Length
           $manifest = @{
             version = $version
             installer_url = "https://github.com/$($env:REPOSITORY)/releases/download/$($env:RELEASE_TAG)/SB3QuestCompleter-Setup.exe"
             sha256 = $hash
+            size = $size
           } | ConvertTo-Json
           Set-Content update.json $manifest -Encoding UTF8
           git config user.name "github-actions[bot]"
