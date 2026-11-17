@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1299,38 +1299,47 @@ class QuestCompleterApp:
     def build_account_widget(self, parent: tk.Frame) -> None:
         account = tk.Frame(parent, bg=BG)
         account.pack(side="right", padx=(18, 0))
-        self.account_avatar = tk.Canvas(account, width=86, height=86, bg=BG,
+        user_info = load_discord_session().get("user") or {}
+        self.account_avatar = tk.Canvas(account, width=24, height=24, bg=BG,
                                        highlightthickness=0, bd=0, cursor="hand2")
         self.account_avatar.pack(side="left")
-        self.account_avatar_item = self.account_avatar.create_text(43, 43, text="?", fill=TEXT,
-                                                                    font=("Segoe UI", 18, "bold"))
+        self.account_avatar_item = self.account_avatar.create_text(12, 12, text=self._avatar_initials(user_info), fill=TEXT,
+                                                                    font=("Segoe UI", 8, "bold"))
         self.account_avatar.bind("<Button-1>", lambda _event: self.toggle_account_menu())
-        user_info = load_discord_session().get("user") or {}
         self.account_avatar_image = None
         self.account_avatar_thumb_image = None
         self.load_account_avatar(user_info)
 
+    @staticmethod
+    def _avatar_initials(user: dict[str, Any]) -> str:
+        name = str(user.get("global_name") or user.get("username") or "SB")
+        letters = "".join(part[0] for part in name.split() if part)
+        return (letters or name[:2] or "SB").upper()[:2]
+
     def load_account_avatar(self, user: dict[str, Any]) -> None:
         user_id = str(user.get("id") or "")
         avatar_hash = str(user.get("avatar") or "")
-        if not requests or not user_id:
+        if not user_id:
             return
+        urls = []
         if avatar_hash:
-            url = f"https://cdn.discordapp.com/avatars/{user_id}/{avatar_hash}.png?size=256"
-        else:
-            try:
-                url = f"https://cdn.discordapp.com/embed/avatars/{int(user_id) % 5}.png"
-            except ValueError:
-                return
+            urls.append(f"https://cdn.discordapp.com/avatars/{user_id}/{avatar_hash}.png?size=128")
+        try:
+            urls.append(f"https://cdn.discordapp.com/embed/avatars/{int(user_id) % 5}.png")
+        except ValueError:
+            pass
+        if not requests:
+            return
 
         def worker() -> None:
-            try:
-                response = requests.get(url, headers=HEADERS, timeout=(5, 15))
-                response.raise_for_status()
-                raw = response.content
-                self.root.after(0, self._apply_account_avatar, raw)
-            except Exception:
-                pass
+            for url in urls:
+                try:
+                    response = requests.get(url, timeout=(5, 15))
+                    response.raise_for_status()
+                    self.root.after(0, self._apply_account_avatar, response.content)
+                    return
+                except Exception:
+                    continue
         threading.Thread(target=worker, daemon=True, name="sb3-account-avatar").start()
 
     def _apply_account_avatar(self, raw: bytes) -> None:
@@ -1338,14 +1347,14 @@ class QuestCompleterApp:
             return
         try:
             image = Image.open(io.BytesIO(raw)).convert("RGBA")
-            image = ImageOps.fit(image, (86, 86), Image.Resampling.LANCZOS)
-            mask = Image.new("L", (86, 86), 0)
-            ImageDraw.Draw(mask).ellipse((0, 0, 85, 85), fill=255)
+            image = ImageOps.fit(image, (24, 24), Image.Resampling.LANCZOS)
+            mask = Image.new("L", (24, 24), 0)
+            ImageDraw.Draw(mask).ellipse((0, 0, 23, 23), fill=255)
             image.putalpha(mask)
             self.account_avatar_image = ImageTk.PhotoImage(image)
-            thumb = ImageOps.fit(image.convert("RGBA"), (48, 48), Image.Resampling.LANCZOS)
-            thumb_mask = Image.new("L", (48, 48), 0)
-            ImageDraw.Draw(thumb_mask).ellipse((0, 0, 47, 47), fill=255)
+            thumb = ImageOps.fit(image.convert("RGBA"), (24, 24), Image.Resampling.LANCZOS)
+            thumb_mask = Image.new("L", (24, 24), 0)
+            ImageDraw.Draw(thumb_mask).ellipse((0, 0, 23, 23), fill=255)
             thumb.putalpha(thumb_mask)
             self.account_avatar_thumb_image = ImageTk.PhotoImage(thumb)
             self.account_avatar.itemconfigure(self.account_avatar_item, image=self.account_avatar_image, text="")
@@ -1370,7 +1379,8 @@ class QuestCompleterApp:
         user_info = load_discord_session().get("user") or {}
         top = tk.Frame(content, bg=PANEL)
         top.pack(fill="x", padx=12, pady=(12, 8))
-        popup_avatar = tk.Label(top, bg=PANEL, fg=TEXT, font=("Segoe UI", 12, "bold"), width=3, height=1,
+        popup_avatar = tk.Label(top, text=self._avatar_initials(user_info), bg=PANEL, fg=TEXT,
+                                font=("Segoe UI", 8, "bold"), width=3, height=1,
                                 highlightthickness=0, bd=0)
         popup_avatar.pack(side="left")
         if getattr(self, "account_avatar_thumb_image", None):
