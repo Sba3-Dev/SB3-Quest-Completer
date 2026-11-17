@@ -25,6 +25,19 @@ def wait_for_process(pid: int) -> None:
         time.sleep(1.0)
 
 
+def replace_file(source: Path, destination: Path) -> None:
+    last_error: OSError | None = None
+    for attempt in range(120):
+        try:
+            os.replace(source, destination)
+            return
+        except PermissionError as error:
+            last_error = error
+            time.sleep(0.5 if attempt < 10 else 1.0)
+    if last_error:
+        raise last_error
+
+
 def copy_tree(source: Path, target: Path) -> None:
     for item in source.iterdir():
         destination = target / item.name
@@ -33,7 +46,7 @@ def copy_tree(source: Path, target: Path) -> None:
                 shutil.rmtree(destination)
             shutil.copytree(item, destination)
         else:
-            os.replace(item, destination)
+            replace_file(item, destination)
 
 
 def main() -> int:
@@ -47,6 +60,8 @@ def main() -> int:
         pid = 0
     app_path = Path(sys.argv[4]).resolve()
     wait_for_process(pid)
+    # Windows may release the executable handle just after the process signal.
+    time.sleep(1.5)
     if not package.is_file() or not install_dir.is_dir():
         return 3
 
