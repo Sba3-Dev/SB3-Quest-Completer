@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.2.8"
+VERSION = "0.2.9"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -430,16 +430,23 @@ def check_saved_discord_session() -> tuple[bool, str]:
     if not refresh_token:
         return False, "missing_session"
     try:
-        result = worker_json_post("/session/check", {"refresh_token": refresh_token})
+        result = worker_json_post("/session/check", {
+            "refresh_token": refresh_token,
+            "access_token": session.get("access_token") or "",
+        })
     except Exception:
         return False, "network"
     if result.get("ok") and result.get("member"):
-        save_discord_session({"refresh_token": result.get("refresh_token", refresh_token), "guild_id": DISCORD_GUILD_ID,
+        save_discord_session({"refresh_token": result.get("refresh_token", refresh_token),
+                              "access_token": result.get("access_token") or session.get("access_token") or "",
+                              "guild_id": DISCORD_GUILD_ID,
                               "user": result.get("user") or session.get("user") or {}})
         return True, "ok"
     rotated_token = str(result.get("refresh_token") or "")
     if rotated_token:
-        save_discord_session({"refresh_token": rotated_token, "guild_id": DISCORD_GUILD_ID,
+        save_discord_session({"refresh_token": rotated_token,
+                              "access_token": result.get("access_token") or session.get("access_token") or "",
+                              "guild_id": DISCORD_GUILD_ID,
                               "user": result.get("user") or session.get("user") or {}})
     return False, str(result.get("error") or "invalid_session")
 
@@ -512,7 +519,9 @@ def discord_login() -> tuple[bool, str]:
     except Exception:
         return False, "network"
     if result.get("ok") and result.get("member") and result.get("refresh_token"):
-        save_discord_session({"refresh_token": result["refresh_token"], "guild_id": DISCORD_GUILD_ID,
+        save_discord_session({"refresh_token": result["refresh_token"],
+                              "access_token": result.get("access_token") or "",
+                              "guild_id": DISCORD_GUILD_ID,
                               "user": result.get("user") or {}})
         return True, "ok"
     return False, str(result.get("error") or "not_in_guild")
