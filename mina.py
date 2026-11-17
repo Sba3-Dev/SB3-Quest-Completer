@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.4.4"
+VERSION = "0.4.5"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -428,7 +428,7 @@ def worker_json_post(endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def check_saved_discord_session() -> tuple[bool, str]:
+def check_saved_discord_session(force_refresh: bool = False) -> tuple[bool, str]:
     session = load_discord_session()
     refresh_token = str(session.get("refresh_token") or "")
     if not refresh_token:
@@ -437,6 +437,7 @@ def check_saved_discord_session() -> tuple[bool, str]:
         result = worker_json_post("/session/check", {
             "refresh_token": refresh_token,
             "access_token": session.get("access_token") or "",
+            "force_refresh": force_refresh,
         })
     except Exception:
         return False, "network"
@@ -1027,14 +1028,19 @@ class QuestCompleterApp:
         """Manually refresh the saved Discord session and membership state."""
         if self.auth_busy:
             return
+        self.membership_watch_active = False
         self.auth_busy = True
         self.build_membership_screen()
         threading.Thread(target=self._refresh_membership_worker, daemon=True, name="sb3-membership-refresh").start()
 
     def _refresh_membership_worker(self) -> None:
-        valid, _reason = check_saved_discord_session()
-        self.root.after(0, lambda: self._finish_membership_check(valid))
+        valid, _reason = check_saved_discord_session(force_refresh=True)
+        if valid:
+            self.root.after(0, lambda: self._finish_membership_check(True))
+            return
+        self.membership_watch_active = True
         self.auth_busy = False
+        self._membership_worker()
 
     def _membership_worker(self) -> None:
         valid = False
@@ -1043,7 +1049,8 @@ class QuestCompleterApp:
             if valid:
                 break
             time.sleep(0.5)
-        self.root.after(0, lambda: self._finish_membership_check(valid))
+        if valid and self.membership_watch_active:
+            self.root.after(0, lambda: self._finish_membership_check(True))
 
     def _finish_membership_check(self, valid: bool) -> None:
         self.membership_watch_active = False
