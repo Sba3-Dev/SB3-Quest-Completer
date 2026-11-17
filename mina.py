@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.4.6"
+VERSION = "0.4.7"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1023,18 +1023,30 @@ class QuestCompleterApp:
         webbrowser.open_new_tab(SUPPORT_DISCORD_URL)
 
     def refresh_membership(self) -> None:
-        """Manually refresh the saved Discord session and membership state."""
+        """Restart the app so Discord membership is checked from a clean session."""
         if self.auth_busy:
             return
         self.membership_watch_active = False
         self.auth_busy = True
-        self.build_membership_screen()
-        threading.Thread(target=self._refresh_membership_worker, daemon=True, name="sb3-membership-refresh").start()
+        try:
+            if getattr(sys, "frozen", False):
+                command = [sys.executable, *sys.argv[1:]]
+                cwd = str(Path(sys.executable).resolve().parent)
+            else:
+                command = [sys.executable, str(Path(sys.argv[0]).resolve()), *sys.argv[1:]]
+                cwd = str(Path(sys.argv[0]).resolve().parent)
+            subprocess.Popen(command, cwd=cwd, close_fds=False)
+        except OSError:
+            self.auth_busy = False
+            self.build_membership_screen(error=True)
+            return
+        self.root.after(50, self._exit_for_restart)
 
-    def _refresh_membership_worker(self) -> None:
-        valid, _reason = check_saved_discord_session(force_refresh=True)
-        self.root.after(0, lambda: self._finish_membership_check(valid))
-        self.auth_busy = False
+    def _exit_for_restart(self) -> None:
+        try:
+            self.root.destroy()
+        finally:
+            os._exit(0)
 
     def _membership_worker(self) -> None:
         valid = False
