@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.1.6"
+VERSION = "0.1.7"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -110,6 +110,7 @@ UI_TEXT = {
         "update_subtitle": "Application update", "update_title": "A new update is available",
         "current_version": "Current version: {version}", "new_version": "New version: {version}",
         "update_button": "Update now", "downloading_update": "Downloading update...",
+        "cancel_update": "Cancel", "update_cancelled": "Update cancelled.",
         "update_error": "There was an error updating. Please try again.", "download_speed": "Speed: {speed}/s",
         "time_remaining": "Time remaining: {time}", "launching_update": "Launching the installer...",
         "installer_size": "Installer size: {size}",
@@ -144,6 +145,7 @@ UI_TEXT = {
         "update_subtitle": "تحديث التطبيق", "update_title": "يتوفر تحديث جديد",
         "current_version": "النسخة الحالية: {version}", "new_version": "النسخة الجديدة: {version}",
         "update_button": "تحديث الآن", "downloading_update": "جارٍ تنزيل التحديث...",
+        "cancel_update": "إلغاء", "update_cancelled": "تم إلغاء التحديث.",
         "update_error": "حدث خطأ في التحديث، يرجى المحاولة مرة أخرى.", "download_speed": "السرعة: {speed}/ث",
         "time_remaining": "الوقت المتبقي: {time}", "launching_update": "جارٍ تشغيل المثبت...",
         "installer_size": "حجم التثبيت: {size}",
@@ -799,6 +801,8 @@ class QuestCompleterApp:
         self.local_game_paths = self.load_local_game_paths()
         self.featured_ranks = self.load_featured_ranks()
         self.auth_busy = False
+        self.update_cancel_event = threading.Event()
+        self.update_temp_path: Path | None = None
         self.latest_manifest: dict[str, Any] | None = None
         self.auth_screen = "login"
         self.membership_watch_active = False
@@ -1072,14 +1076,23 @@ class QuestCompleterApp:
         if self.auth_busy or not self.latest_manifest:
             return
         self.auth_busy = True
+        self.update_cancel_event.clear()
+        self.update_temp_path = None
         self.update_size_label.pack_forget()
         self.update_button.pack_forget()
         self.update_size_label.pack(pady=(0, 7))
         self.update_progress_area.pack(fill="x", pady=(0, 4))
         self.update_button.pack(pady=6)
-        self.update_button.configure(state="disabled")
+        self.update_button.configure(state="normal", text=self.tr("cancel_update"), command=self.cancel_update)
         self.update_status.configure(text=self.tr("downloading_update"))
         threading.Thread(target=self._download_update_worker, daemon=True, name="sb3-update-download").start()
+
+    def cancel_update(self) -> None:
+        if not self.auth_busy:
+            return
+        self.update_cancel_event.set()
+        self.update_button.configure(state="disabled")
+        self.update_status.configure(text=self.tr("update_cancelled"))
 
     def _download_update_worker(self) -> None:
         manifest = self.latest_manifest or {}
@@ -1093,15 +1106,26 @@ class QuestCompleterApp:
             started = time.monotonic()
             suffix = Path(installer_url.split("?", 1)[0]).suffix or ".exe"
             temp_path = Path(tempfile.gettempdir()) / f"SB3QuestCompleter-update-{latest}{suffix}"
+            self.update_temp_path = temp_path
             with temp_path.open("wb") as target:
                 for chunk in download.iter_content(chunk_size=1024 * 1024):
                     if chunk:
+                        if self.update_cancel_event.is_set():
+                            try: temp_path.unlink(missing_ok=True)
+                            except OSError: pass
+                            self.root.after(0, self._update_cancelled)
+                            return
                         target.write(chunk)
                         received += len(chunk)
                         elapsed = max(0.001, time.monotonic() - started)
                         speed = received / elapsed
                         eta = (total - received) / speed if total and speed > 0 else None
                         self.root.after(0, self._render_download_progress, received, total, speed, eta)
+            if self.update_cancel_event.is_set():
+                try: temp_path.unlink(missing_ok=True)
+                except OSError: pass
+                self.root.after(0, self._update_cancelled)
+                return
             expected_hash = str(manifest.get("sha256", "")).strip().casefold()
             if expected_hash:
                 digest = hashlib.sha256(temp_path.read_bytes()).hexdigest().casefold()
@@ -1109,19 +1133,42 @@ class QuestCompleterApp:
                     raise ValueError("update checksum mismatch")
             if os.name != "nt":
                 raise RuntimeError("Windows installer can only run on Windows")
+            if self.update_cancel_event.is_set():
+                try: temp_path.unlink(missing_ok=True)
+                except OSError: pass
+                self.root.after(0, self._update_cancelled)
+                return
             self.root.after(0, self._render_download_progress, max(received, total), total, max(0.0, received / max(0.001, time.monotonic() - started)), 0.0)
             self.root.after(0, lambda: self.update_status.configure(text=self.tr("launching_update")))
             subprocess.Popen([
                 str(temp_path), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
                 "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS", "/TASKS=",
             ])
-            self.root.after(0, self.root.destroy)
+            self.root.after(250, self._exit_for_update)
         except Exception:
+            temp_path = self.update_temp_path
+            if temp_path:
+                try: temp_path.unlink(missing_ok=True)
+                except OSError: pass
             self.root.after(0, lambda: self._update_failed())
+
+    def _exit_for_update(self) -> None:
+        """Exit completely so the silent installer can replace the one-file executable safely."""
+        try:
+            self.root.destroy()
+        finally:
+            os._exit(0)
+
+    def _update_cancelled(self) -> None:
+        self.auth_busy = False
+        self.update_temp_path = None
+        self.update_progress_area.pack_forget()
+        self.update_button.configure(state="normal", text=self.tr("update_button"), command=self.install_latest_update)
+        self.update_status.configure(text=self.tr("update_cancelled"))
 
     def _update_failed(self) -> None:
         self.auth_busy = False
-        self.update_button.configure(state="normal")
+        self.update_button.configure(state="normal", text=self.tr("update_button"), command=self.install_latest_update)
         self.update_status.configure(text=self.tr("update_error"))
 
     # ---- Visual system ----
@@ -1210,10 +1257,11 @@ class QuestCompleterApp:
     def build_account_widget(self, parent: tk.Frame) -> None:
         account = tk.Frame(parent, bg=BG)
         account.pack(side="right", padx=(18, 0))
-        self.account_avatar = tk.Label(account, text="?", bg=BG, fg=TEXT,
-                                       font=("Segoe UI", 18, "bold"), width=4, height=2,
+        self.account_avatar = tk.Canvas(account, width=200, height=200, bg=BG,
                                        highlightthickness=0, bd=0, cursor="hand2")
         self.account_avatar.pack(side="left")
+        self.account_avatar_item = self.account_avatar.create_text(100, 100, text="?", fill=TEXT,
+                                                                    font=("Segoe UI", 30, "bold"))
         self.account_avatar.bind("<Button-1>", lambda _event: self.toggle_account_menu())
         user_info = load_discord_session().get("user") or {}
         self.account_avatar_image = None
@@ -1248,9 +1296,9 @@ class QuestCompleterApp:
             return
         try:
             image = Image.open(io.BytesIO(raw)).convert("RGBA")
-            image = ImageOps.fit(image, (256, 256), Image.Resampling.LANCZOS)
-            mask = Image.new("L", (256, 256), 0)
-            ImageDraw.Draw(mask).ellipse((0, 0, 255, 255), fill=255)
+            image = ImageOps.fit(image, (200, 200), Image.Resampling.LANCZOS)
+            mask = Image.new("L", (200, 200), 0)
+            ImageDraw.Draw(mask).ellipse((0, 0, 199, 199), fill=255)
             image.putalpha(mask)
             self.account_avatar_image = ImageTk.PhotoImage(image)
             thumb = ImageOps.fit(image.convert("RGBA"), (48, 48), Image.Resampling.LANCZOS)
@@ -1258,7 +1306,7 @@ class QuestCompleterApp:
             ImageDraw.Draw(thumb_mask).ellipse((0, 0, 47, 47), fill=255)
             thumb.putalpha(thumb_mask)
             self.account_avatar_thumb_image = ImageTk.PhotoImage(thumb)
-            self.account_avatar.configure(image=self.account_avatar_image, text="")
+            self.account_avatar.itemconfigure(self.account_avatar_item, image=self.account_avatar_image, text="")
         except (OSError, tk.TclError):
             pass
 
