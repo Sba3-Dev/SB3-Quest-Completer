@@ -44,7 +44,7 @@ jobs:
         shell: cmd
         run: >-
           python -m PyInstaller --noconfirm --clean --onefile --windowed
-          --name SB3QuestCompleter --icon logo.ico
+          --name SB3QuestCompleter --icon "%CD%\logo.ico"
           --add-data "%CD%\logo.ico;." --add-data "%CD%\assets;assets"
           --distpath dist --workpath build --specpath build mina.py
 
