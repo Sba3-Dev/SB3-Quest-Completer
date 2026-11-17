@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.4.5"
+VERSION = "0.4.6"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1018,11 +1018,9 @@ class QuestCompleterApp:
 
     def join_and_recheck(self) -> None:
         self.membership_join_pressed = True
+        self.membership_watch_active = False
         self.build_membership_screen()
         webbrowser.open_new_tab(SUPPORT_DISCORD_URL)
-        if not self.membership_watch_active:
-            self.membership_watch_active = True
-            threading.Thread(target=self._membership_worker, daemon=True, name="sb3-membership-check").start()
 
     def refresh_membership(self) -> None:
         """Manually refresh the saved Discord session and membership state."""
@@ -1035,12 +1033,8 @@ class QuestCompleterApp:
 
     def _refresh_membership_worker(self) -> None:
         valid, _reason = check_saved_discord_session(force_refresh=True)
-        if valid:
-            self.root.after(0, lambda: self._finish_membership_check(True))
-            return
-        self.membership_watch_active = True
+        self.root.after(0, lambda: self._finish_membership_check(valid))
         self.auth_busy = False
-        self._membership_worker()
 
     def _membership_worker(self) -> None:
         valid = False
