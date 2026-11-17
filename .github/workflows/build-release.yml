@@ -49,9 +49,10 @@ jobs:
           --distpath dist --workpath build --specpath build mina.py
 
       - name: Build Setup.exe
-        uses: Minionguyjpro/Inno-Setup-Compiler@main
-        with:
-          filepath: installer.iss
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress --yes
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
 
       - name: Upload installer to GitHub Release
         if: github.event_name == 'release'
