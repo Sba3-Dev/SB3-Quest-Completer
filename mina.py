@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.4.2"
+VERSION = "0.4.3"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -549,7 +549,6 @@ def discord_login() -> tuple[bool, str]:
             direction = "rtl" if arabic else "ltr"
             title = "تم تسجيل الدخول بنجاح" if arabic else "Signed in successfully"
             message = "يمكنك إغلاق هذه الصفحة والعودة إلى الأداة." if arabic else "You can close this page and return to the app."
-            close_text = "إغلاق والعودة إلى الأداة" if arabic else "Close and return to the app"
             try:
                 icon = base64.b64encode(resource_path("logo.ico").read_bytes()).decode("ascii")
             except OSError:
@@ -559,9 +558,8 @@ def discord_login() -> tuple[bool, str]:
             <style>body{{margin:0;background:#0e080a;color:#f7eff0;font-family:Segoe UI,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}}
             .card{{width:350px;padding:34px 28px;border:1px solid #3b2026;border-radius:24px;background:#1b0c10;text-align:center;box-shadow:0 18px 60px #0008}}
             .logo{{width:78px;height:78px;object-fit:contain;margin-bottom:16px}}.logo-fallback{{font-size:30px;font-weight:700;color:#a7474d;margin-bottom:16px}}
-            h1{{font-size:20px;margin:0 0 12px}}p{{color:#ccb8bc;font-size:14px;line-height:1.6;margin:0 0 24px}}button{{border:0;border-radius:12px;padding:13px 20px;background:#a7474d;color:#fff;font-size:14px;cursor:pointer}}button:hover{{background:#b9585e}}</style></head>
-            <body><main class="card">{icon_html}<h1>{title}</h1><p>{message}</p><button onclick="closePage()">{close_text}</button></main>
-            <script>function closePage(){{try{{window.open('', '_self', '');}}catch(e){{}}try{{window.close();}}catch(e){{}}}}</script></body></html>'''.encode("utf-8")
+            h1{{font-size:20px;margin:0 0 12px}}p{{color:#ccb8bc;font-size:14px;line-height:1.6;margin:0}}</style></head>
+            <body><main class="card">{icon_html}<h1>{title}</h1><p>{message}</p></main></body></html>'''.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
