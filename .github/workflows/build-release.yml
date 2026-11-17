@@ -51,7 +51,7 @@ jobs:
       - name: Build silent updater
         shell: cmd
         run: >-
-          python -m PyInstaller --noconfirm --clean --onefile --console
+          python -m PyInstaller --noconfirm --clean --onefile --windowed
           --name SB3Updater --distpath dist --workpath build-updater --specpath build-updater updater.py
 
       - name: Create update ZIP
