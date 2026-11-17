@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import base64
 import hashlib
 import http.server
 import json
@@ -40,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.0.9"
+VERSION = "0.1.0"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -100,6 +101,16 @@ UI_TEXT = {
         "stopped_tasks": "● Stopped {count} active task(s)",
         "support_title": "Sba3 Dev Support", "support_message": "Join our Discord server for support and updates.",
         "join_support": "Join Discord server",
+        "auth_subtitle": "Discord access required", "login_title": "Sign in with Discord",
+        "login_message": "Sign in with your Discord account to continue.", "login_button": "Sign in with Discord",
+        "checking_session": "Checking saved Discord session...", "checking_updates": "Checking for updates...",
+        "membership_subtitle": "Discord server access", "membership_title": "To use the app, join the SB3 server",
+        "membership_message": "Click the button, join the server, then return to the app.",
+        "membership_error": "There was an error joining. Please try again.", "join_button": "Join the server",
+        "update_subtitle": "Application update", "update_title": "A new update is available",
+        "current_version": "Current version: {version}", "new_version": "New version: {version}",
+        "update_button": "Update now", "downloading_update": "Downloading update...",
+        "update_error": "There was an error updating. Please try again.",
     },
     "ar": {
         "settings": "الإعدادات", "settings_title": "الإعدادات", "settings_note": "تُحفظ التغييرات محليًا وتُطبّق فورًا.",
@@ -122,6 +133,16 @@ UI_TEXT = {
         "stopped_tasks": "● تم إيقاف {count} من المهام النشطة",
         "support_title": "دعم Sba3 Dev", "support_message": "انضم إلى سيرفر Discord للدعم والحصول على آخر التحديثات.",
         "join_support": "انضم إلى سيرفر Discord",
+        "auth_subtitle": "تسجيل الدخول عبر Discord", "login_title": "تسجيل الدخول عبر Discord",
+        "login_message": "سجّل دخولك بحساب Discord للمتابعة إلى الأداة.", "login_button": "تسجيل الدخول عبر Discord",
+        "checking_session": "جارٍ فحص جلسة Discord المحفوظة...", "checking_updates": "جارٍ فحص التحديثات...",
+        "membership_subtitle": "الوصول إلى سيرفر Discord", "membership_title": "لاستخدام الأداة يجب عليك الانضمام إلى سيرفر SB3",
+        "membership_message": "اضغط الزر، انضم إلى السيرفر، ثم ارجع إلى الأداة.",
+        "membership_error": "حدث خطأ في الانضمام، يرجى المحاولة مرة أخرى.", "join_button": "انضمام إلى السيرفر",
+        "update_subtitle": "تحديث التطبيق", "update_title": "يتوفر تحديث جديد",
+        "current_version": "النسخة الحالية: {version}", "new_version": "النسخة الجديدة: {version}",
+        "update_button": "تحديث الآن", "downloading_update": "جارٍ تنزيل التحديث...",
+        "update_error": "حدث خطأ في التحديث، يرجى المحاولة مرة أخرى.",
     },
 }
 
@@ -426,11 +447,30 @@ def discord_login() -> tuple[bool, str]:
             returned_state = str((params.get("state") or [""])[0])
             error = str((params.get("error") or [""])[0])
             result_queue.put((code if returned_state == state else "", error or "state_error" if returned_state != state else ""))
-            body = '''<!doctype html><html><head><meta charset="utf-8"><title>SB3</title></head>
-            <body><script>
-            try { window.open('', '_self'); window.close(); } catch (e) {}
-            setTimeout(function(){ document.body.innerHTML = '<p>تم تسجيل الدخول. يمكنك إغلاق هذه الصفحة.</p>'; }, 400);
-            </script><p>تم تسجيل الدخول، جارٍ الرجوع إلى الأداة...</p></body></html>'''.encode("utf-8")
+            language = "en"
+            try:
+                settings = json.loads((Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "settings.json").read_text(encoding="utf-8"))
+                language = str(settings.get("language", "en")) if isinstance(settings, dict) else "en"
+            except (OSError, ValueError, TypeError):
+                pass
+            arabic = language == "ar"
+            direction = "rtl" if arabic else "ltr"
+            title = "تم تسجيل الدخول" if arabic else "Discord login complete"
+            message = "تم تسجيل الدخول بنجاح، ارجع إلى الأداة." if arabic else "You are signed in. Return to the app."
+            button = "الانتقال إلى الأداة" if arabic else "Continue to the app"
+            try:
+                icon = base64.b64encode(resource_path("logo.ico").read_bytes()).decode("ascii")
+            except OSError:
+                icon = ""
+            icon_html = f'<img src="data:image/x-icon;base64,{icon}" alt="SB3" class="logo">' if icon else '<div class="logo-fallback">SB3</div>'
+            body = f'''<!doctype html><html lang="{'ar' if arabic else 'en'}" dir="{direction}"><head><meta charset="utf-8"><title>SB3</title>
+            <style>body{{margin:0;background:#0e080a;color:#f7eff0;font-family:Segoe UI,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}}
+            .card{{width:360px;padding:42px 32px;border-radius:24px;background:#1b0c10;text-align:center;box-shadow:0 18px 60px #0008}}
+            .logo{{width:88px;height:88px;object-fit:contain;margin-bottom:18px}}.logo-fallback{{font-size:32px;font-weight:700;color:#a7474d;margin-bottom:18px}}
+            h1{{font-size:20px;margin:0 0 12px}}p{{color:#ccb8bc;font-size:14px;margin:0 0 24px}}button{{border:0;border-radius:12px;padding:13px 24px;background:#a7474d;color:white;font-size:14px;cursor:pointer}}button:hover{{background:#b9585e}}</style></head>
+            <body><main class="card">{icon_html}<h1>{title}</h1><p>{message}</p><button onclick="closeAndReturn()">{button}</button></main>
+            <script>function closeAndReturn(){{try{{window.open('', '_self');window.close();}}catch(e){{}}}}
+            setTimeout(closeAndReturn, 650);</script></body></html>'''.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -755,6 +795,7 @@ class QuestCompleterApp:
         self.auth_busy = False
         self.latest_manifest: dict[str, Any] | None = None
         self.auth_screen = "login"
+        self.membership_watch_active = False
         self.root.after(100, self.start_startup_gate)
 
     def _clear_root(self) -> None:
@@ -785,19 +826,19 @@ class QuestCompleterApp:
 
     def build_login_screen(self, note: str = "") -> None:
         self._clear_root()
-        self._auth_header("Discord access required")
+        self._auth_header(self.tr("auth_subtitle"))
         surface = RoundedSurface(self.root, fill=PANEL, radius=24, width=520, height=420, background=BG)
         surface.pack(fill="both", expand=True, padx=260, pady=(35, 75))
         content = surface.content
         self._add_panel_logo(content, 92)
-        tk.Label(content, text="تسجيل الدخول عبر Discord", bg=PANEL, fg=TEXT,
+        tk.Label(content, text=self.tr("login_title"), bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 14, "bold")).pack(pady=(0, 9))
-        tk.Label(content, text="سجّل دخولك بحساب Discord للمتابعة إلى الأداة.", bg=PANEL,
+        tk.Label(content, text=self.tr("login_message"), bg=PANEL,
                  fg=TEXT_DIM, font=("Segoe UI", 9), wraplength=350, justify="center").pack(pady=(0, 18))
         self.auth_note = tk.Label(content, text=note, bg=PANEL, fg=RED_HOVER,
                                   font=("Segoe UI", 9), wraplength=350, justify="center")
         self.auth_note.pack(pady=(0, 12))
-        self.auth_button = PillButton(content, text="تسجيل الدخول عبر Discord", command=self.start_discord_login,
+        self.auth_button = PillButton(content, text=self.tr("login_button"), command=self.start_discord_login,
                                       fill=RED, hover_fill=RED_HOVER, width=250, height=42, background=PANEL)
         self.auth_button.pack(pady=6)
         self.auth_screen = "login"
@@ -806,20 +847,20 @@ class QuestCompleterApp:
 
     def build_membership_screen(self, error: bool = False) -> None:
         self._clear_root()
-        self._auth_header("Discord server access")
+        self._auth_header(self.tr("membership_subtitle"))
         surface = RoundedSurface(self.root, fill=PANEL, radius=24, width=520, height=420, background=BG)
         surface.pack(fill="both", expand=True, padx=260, pady=(35, 75))
         content = surface.content
         self._add_panel_logo(content, 92)
-        tk.Label(content, text="لاستخدام الأداة يجب عليك الانضمام إلى سيرفر SB3", bg=PANEL,
+        tk.Label(content, text=self.tr("membership_title"), bg=PANEL,
                  fg=TEXT, font=("Segoe UI", 13, "bold"), wraplength=355, justify="center").pack(pady=(0, 12))
         if error:
-            tk.Label(content, text="حدث خطاء في الانضمام، يرجى المحاولة مرة اخرى", bg=PANEL,
+            tk.Label(content, text=self.tr("membership_error"), bg=PANEL,
                      fg=RED_HOVER, font=("Segoe UI", 9), wraplength=350, justify="center").pack(pady=(0, 12))
         else:
-            tk.Label(content, text="اضغط الزر، انضم إلى السيرفر، ثم ارجع إلى الأداة.", bg=PANEL,
+            tk.Label(content, text=self.tr("membership_message"), bg=PANEL,
                      fg=TEXT_DIM, font=("Segoe UI", 9), wraplength=350, justify="center").pack(pady=(0, 12))
-        self.auth_button = PillButton(content, text="انضمام إلى السيرفر", command=self.join_and_recheck,
+        self.auth_button = PillButton(content, text=self.tr("join_button"), command=self.join_and_recheck,
                                       fill=RED, hover_fill=RED_HOVER, width=220, height=42, background=PANEL)
         self.auth_button.pack(pady=6)
         self.auth_screen = "membership"
@@ -828,14 +869,14 @@ class QuestCompleterApp:
 
     def start_auth_gate(self) -> None:
         self.auth_busy = True
-        self.build_login_screen("جارٍ فحص جلسة Discord المحفوظة...")
+        self.build_login_screen(self.tr("checking_session"))
         self.auth_button.configure(state="disabled")
         threading.Thread(target=self._auth_check_worker, daemon=True, name="sb3-auth-check").start()
 
     def start_startup_gate(self) -> None:
         """Check the update manifest before showing Discord login."""
         self.auth_busy = True
-        self.build_login_screen("جارٍ فحص التحديثات...")
+        self.build_login_screen(self.tr("checking_updates"))
         self.auth_button.configure(state="disabled")
         threading.Thread(target=self._startup_update_worker, daemon=True, name="sb3-startup-update").start()
 
@@ -873,7 +914,7 @@ class QuestCompleterApp:
         if self.auth_busy:
             return
         self.auth_busy = True
-        self.build_login_screen("جارٍ فتح تسجيل الدخول عبر Discord...")
+        self.build_login_screen(self.tr("checking_session"))
         threading.Thread(target=self._login_worker, daemon=True, name="sb3-auth-login").start()
 
     def _login_worker(self) -> None:
@@ -882,26 +923,22 @@ class QuestCompleterApp:
         self.auth_busy = False
 
     def join_and_recheck(self) -> None:
-        if self.auth_busy:
-            return
-        self.auth_busy = True
         webbrowser.open_new_tab(SUPPORT_DISCORD_URL)
-        self.build_membership_screen()
-        self.auth_button.configure(state="disabled")
-        threading.Thread(target=self._membership_worker, daemon=True, name="sb3-membership-check").start()
+        if not self.membership_watch_active:
+            self.membership_watch_active = True
+            threading.Thread(target=self._membership_worker, daemon=True, name="sb3-membership-check").start()
 
     def _membership_worker(self) -> None:
-        time.sleep(2)
         valid = False
-        for _ in range(30):
+        while self.membership_watch_active:
             valid, _reason = check_saved_discord_session()
             if valid:
                 break
-            time.sleep(2)
+            time.sleep(0.5)
         self.root.after(0, lambda: self._finish_membership_check(valid))
 
     def _finish_membership_check(self, valid: bool) -> None:
-        self.auth_busy = False
+        self.membership_watch_active = False
         if valid:
             self.open_main_interface()
         else:
@@ -951,23 +988,23 @@ class QuestCompleterApp:
         latest = str(manifest.get("version", "")).strip()
         self._clear_root()
         self.auth_screen = "update"
-        self._auth_header("Application update")
+        self._auth_header(self.tr("update_subtitle"))
         surface = RoundedSurface(self.root, fill=PANEL, radius=24, width=520, height=420, background=BG)
         surface.pack(fill="both", expand=True, padx=260, pady=(35, 75))
         content = surface.content
         self._add_panel_logo(content, 92)
-        tk.Label(content, text="يتوفر تحديث جديد", bg=PANEL, fg=TEXT,
+        tk.Label(content, text=self.tr("update_title"), bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 14, "bold")).pack(pady=(0, 18))
         versions = tk.Frame(content, bg=PANEL)
         versions.pack(pady=(0, 18))
-        tk.Label(versions, text=f"النسخة الحالية: {VERSION}", bg=PANEL, fg=TEXT_DIM,
+        tk.Label(versions, text=self.tr("current_version", version=VERSION), bg=PANEL, fg=TEXT_DIM,
                  font=("Segoe UI", 10)).pack()
-        tk.Label(versions, text=f"النسخة الجديدة: {latest}", bg=PANEL, fg=SUCCESS,
+        tk.Label(versions, text=self.tr("new_version", version=latest), bg=PANEL, fg=SUCCESS,
                  font=("Segoe UI", 10, "bold")).pack(pady=(6, 0))
         self.update_status = tk.Label(content, text="", bg=PANEL, fg=TEXT_DIM,
                                       font=("Segoe UI", 9), wraplength=350, justify="center")
         self.update_status.pack(pady=(0, 12))
-        self.update_button = PillButton(content, text="تحديث الآن", command=self.install_latest_update,
+        self.update_button = PillButton(content, text=self.tr("update_button"), command=self.install_latest_update,
                                         fill=RED, hover_fill=RED_HOVER, width=190, height=42, background=PANEL)
         self.update_button.pack(pady=6)
         self._auth_footer()
@@ -978,7 +1015,7 @@ class QuestCompleterApp:
             return
         self.auth_busy = True
         self.update_button.configure(state="disabled")
-        self.update_status.configure(text="جارٍ تنزيل التحديث...")
+        self.update_status.configure(text=self.tr("downloading_update"))
         threading.Thread(target=self._download_update_worker, daemon=True, name="sb3-update-download").start()
 
     def _download_update_worker(self) -> None:
@@ -1009,7 +1046,7 @@ class QuestCompleterApp:
     def _update_failed(self) -> None:
         self.auth_busy = False
         self.update_button.configure(state="normal")
-        self.update_status.configure(text="حدث خطأ في التحديث، يرجى المحاولة مرة أخرى")
+        self.update_status.configure(text=self.tr("update_error"))
 
     # ---- Visual system ----
     def _enable_button_feedback(self, button: tk.Button) -> None:
