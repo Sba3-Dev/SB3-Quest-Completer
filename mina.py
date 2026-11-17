@@ -39,9 +39,13 @@ try:
     from pypresence import Presence
 except ImportError:
     Presence = None
+try:
+    import webview
+except ImportError:
+    webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.2.9"
+VERSION = "0.3.0"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -457,6 +461,15 @@ def discord_login() -> tuple[bool, str]:
     result_queue: queue.Queue[tuple[str, str]] = queue.Queue()
     state = secrets.token_urlsafe(32)
 
+    def close_embedded_window() -> None:
+        if not webview:
+            return
+        try:
+            for window in list(webview.windows):
+                window.destroy()
+        except Exception:
+            pass
+
     class CallbackHandler(http.server.BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
@@ -465,35 +478,14 @@ def discord_login() -> tuple[bool, str]:
             returned_state = str((params.get("state") or [""])[0])
             error = str((params.get("error") or [""])[0])
             result_queue.put((code if returned_state == state else "", error or "state_error" if returned_state != state else ""))
-            language = "en"
-            try:
-                settings = json.loads((Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "settings.json").read_text(encoding="utf-8"))
-                language = str(settings.get("language", "en")) if isinstance(settings, dict) else "en"
-            except (OSError, ValueError, TypeError):
-                pass
-            arabic = language == "ar"
-            direction = "rtl" if arabic else "ltr"
-            title = "تم تسجيل الدخول" if arabic else "Discord login complete"
-            message = "تم تسجيل الدخول بنجاح، ارجع إلى الأداة." if arabic else "You are signed in. Return to the app."
-            button = "الانتقال إلى الأداة" if arabic else "Continue to the app"
-            try:
-                icon = base64.b64encode(resource_path("logo.ico").read_bytes()).decode("ascii")
-            except OSError:
-                icon = ""
-            icon_html = f'<img src="data:image/x-icon;base64,{icon}" alt="SB3" class="logo">' if icon else '<div class="logo-fallback">SB3</div>'
-            body = f'''<!doctype html><html lang="{'ar' if arabic else 'en'}" dir="{direction}"><head><meta charset="utf-8"><title>SB3</title>
-            <style>body{{margin:0;background:#0e080a;color:#f7eff0;font-family:Segoe UI,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}}
-            .card{{width:360px;padding:42px 32px;border-radius:24px;background:#1b0c10;text-align:center;box-shadow:0 18px 60px #0008}}
-            .logo{{width:88px;height:88px;object-fit:contain;margin-bottom:18px}}.logo-fallback{{font-size:32px;font-weight:700;color:#a7474d;margin-bottom:18px}}
-            h1{{font-size:20px;margin:0 0 12px}}p{{color:#ccb8bc;font-size:14px;margin:0 0 24px}}button{{border:0;border-radius:12px;padding:13px 24px;background:#a7474d;color:white;font-size:14px;cursor:pointer}}button:hover{{background:#b9585e}}</style></head>
-            <body><main class="card">{icon_html}<h1>{title}</h1><p>{message}</p><button onclick="closeAndReturn()">{button}</button></main>
-            <script>function closeAndReturn(){{try{{window.open('', '_self', '');}}catch(e){{}}try{{window.close();}}catch(e){{}}setTimeout(function(){{try{{window.open('', '_self');window.close();}}catch(e){{}}}},120);}}
-            setTimeout(closeAndReturn, 650);</script></body></html>'''.encode("utf-8")
+            body = b"<!doctype html><html><body style='background:#0e080a'></body></html>"
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+            if webview:
+                threading.Timer(0.15, close_embedded_window).start()
 
         def log_message(self, _format: str, *_args: Any) -> None:
             return
@@ -506,8 +498,25 @@ def discord_login() -> tuple[bool, str]:
             "scope": DISCORD_OAUTH_SCOPES, "state": state,
             "redirect_uri": DISCORD_REDIRECT_URI,
         })
-        webbrowser.open(auth_url)
-        server.handle_request()
+        def serve_callback() -> None:
+            server.handle_request()
+
+        callback_thread = threading.Thread(target=serve_callback, daemon=True)
+        callback_thread.start()
+        if webview:
+            try:
+                webview.create_window("SB3 Discord Login", auth_url, width=480, height=760,
+                                      resizable=True, min_size=(420, 620))
+                webview.start(gui="edgechromium", debug=False)
+            except Exception:
+                # Older Windows installations may not have the WebView2 runtime yet.
+                # Keep login usable there while newer installations remain fully embedded.
+                webbrowser.open(auth_url)
+                callback_thread.join(timeout=180)
+        else:
+            webbrowser.open(auth_url)
+            callback_thread.join(timeout=180)
+        callback_thread.join(timeout=5)
         server.server_close()
         code, error = result_queue.get_nowait()
     except (OSError, queue.Empty):
