@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import io
 import hashlib
+import http.server
 import json
 import os
+import queue
+import secrets
 import shutil
 import subprocess
 import sys
@@ -16,7 +19,7 @@ import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 try:
     import tkinter as tk
@@ -37,7 +40,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.0.5"
+VERSION = "0.0.6"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -339,14 +342,159 @@ class SoftScrollbar(tk.Canvas):
 DISCORD_DETECTABLE_URL = "https://discord.com/api/v10/applications/detectable"
 DISCORD_ICON_URL = "https://cdn.discordapp.com/app-icons/{app_id}/{icon_hash}.png?size=64"
 HEADERS = {"User-Agent": "SB3QuestCompleter/1.1", "Accept": "application/json"}
-DISCORD_CLIENT_ID = os.getenv("SB3_DISCORD_CLIENT_ID", "")
+DISCORD_CLIENT_ID = os.getenv("SB3_DISCORD_CLIENT_ID", "1541619305592922162")
 SUPPORT_DISCORD_URL = "https://discord.gg/WcknYK29Hq"
+DISCORD_GUILD_ID = "1371820874293838004"
+DISCORD_REDIRECT_URI = "http://127.0.0.1:53134/callback/SB3"
+DISCORD_AUTH_WORKER_URL = "https://sb3-discord-auth.sb3-auth-2026-2136.workers.dev"
+DISCORD_OAUTH_SCOPES = "identify guilds.members.read"
 PAGE_SIZE = 60
 FEATURED_LIMIT = 60
 
 
 def resource_path(name: str) -> Path:
     return Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)) / name
+
+
+def discord_session_file() -> Path:
+    return Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "discord_session.json"
+
+
+def load_discord_session() -> dict[str, Any]:
+    try:
+        data = json.loads(discord_session_file().read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def save_discord_session(data: dict[str, Any]) -> None:
+    try:
+        path = discord_session_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def clear_discord_session() -> None:
+    try:
+        discord_session_file().unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def worker_json_post(endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if not requests:
+        return {}
+    response = requests.post(f"{DISCORD_AUTH_WORKER_URL}{endpoint}", json=payload, timeout=(5, 20))
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    if not isinstance(data, dict):
+        return {}
+    return data
+
+
+def check_saved_discord_session() -> tuple[bool, str]:
+    session = load_discord_session()
+    refresh_token = str(session.get("refresh_token") or "")
+    if not refresh_token:
+        return False, "missing_session"
+    try:
+        result = worker_json_post("/session/check", {"refresh_token": refresh_token})
+    except Exception:
+        return False, "network"
+    if result.get("ok") and result.get("member"):
+        save_discord_session({"refresh_token": result.get("refresh_token", refresh_token), "guild_id": DISCORD_GUILD_ID})
+        return True, "ok"
+    return False, str(result.get("error") or "invalid_session")
+
+
+def discord_login() -> tuple[bool, str]:
+    if not DISCORD_CLIENT_ID:
+        return False, "missing_client_id"
+    result_queue: queue.Queue[tuple[str, str]] = queue.Queue()
+    state = secrets.token_urlsafe(32)
+
+    class CallbackHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            code = str((params.get("code") or [""])[0])
+            returned_state = str((params.get("state") or [""])[0])
+            error = str((params.get("error") or [""])[0])
+            result_queue.put((code if returned_state == state else "", error or "state_error" if returned_state != state else ""))
+            body = b"<html><body><h2>Discord login complete</h2><p>You can close this window and return to SB3 Quest Completer.</p></body></html>"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, _format: str, *_args: Any) -> None:
+            return
+
+    try:
+        server = http.server.HTTPServer(("127.0.0.1", 53134), CallbackHandler)
+        server.timeout = 180
+        auth_url = "https://discord.com/oauth2/authorize?" + urlencode({
+            "response_type": "code", "client_id": DISCORD_CLIENT_ID,
+            "scope": DISCORD_OAUTH_SCOPES, "state": state,
+            "redirect_uri": DISCORD_REDIRECT_URI,
+        })
+        webbrowser.open(auth_url)
+        server.handle_request()
+        server.server_close()
+        code, error = result_queue.get_nowait()
+    except (OSError, queue.Empty):
+        return False, "callback_timeout"
+    if error or not code:
+        return False, error or "authorization_failed"
+    try:
+        result = worker_json_post("/oauth/exchange", {"code": code, "redirect_uri": DISCORD_REDIRECT_URI})
+    except Exception:
+        return False, "network"
+    if result.get("ok") and result.get("member") and result.get("refresh_token"):
+        save_discord_session({"refresh_token": result["refresh_token"], "guild_id": DISCORD_GUILD_ID})
+        return True, "ok"
+    return False, str(result.get("error") or "not_in_guild")
+
+
+def ensure_discord_access(root: tk.Tk) -> bool:
+    while True:
+        valid, reason = check_saved_discord_session()
+        if valid:
+            return True
+        if reason not in {"missing_session", "invalid_session", "network", "not_in_guild"}:
+            clear_discord_session()
+        if reason in {"not_in_guild", "invalid_session"}:
+            webbrowser.open_new_tab(SUPPORT_DISCORD_URL)
+            retry = messagebox.askretrycancel(
+                "Discord server required",
+                "You must be a member of the support Discord server to use SB3 Quest Completer.\n\n"
+                "Join the server in your browser, then press Retry.", parent=root)
+            if not retry:
+                return False
+            continue
+        logged_in, login_reason = discord_login()
+        if logged_in:
+            return True
+        if login_reason == "not_in_guild":
+            webbrowser.open_new_tab(SUPPORT_DISCORD_URL)
+            retry = messagebox.askretrycancel(
+                "Discord server required",
+                "Your Discord account is not in the required server.\n\n"
+                "Join it, then press Retry.", parent=root)
+            if retry:
+                continue
+            return False
+        retry = messagebox.askretrycancel(
+            "Discord login required",
+            "Discord login could not be completed. Press Retry to try again.", parent=root)
+        if not retry:
+            return False
 
 
 def win_executable(game: dict[str, Any]) -> str | None:
@@ -1619,6 +1767,11 @@ def main() -> None:
         return
 
     root = tk.Tk()
+    root.withdraw()
+    if not ensure_discord_access(root):
+        root.destroy()
+        return
+    root.deiconify()
     QuestCompleterApp(root)
     root.mainloop()
 
