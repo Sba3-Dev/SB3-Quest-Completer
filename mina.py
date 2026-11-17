@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.2.5"
+VERSION = "0.2.6"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1304,13 +1304,13 @@ class QuestCompleterApp:
         account = tk.Frame(parent, bg=BG)
         account.pack(side="right", padx=(18, 0))
         user_info = load_discord_session().get("user") or {}
-        self.account_avatar = tk.Canvas(account, width=24, height=24, bg=BG,
+        self.account_avatar = tk.Canvas(account, width=34, height=34, bg=BG,
                                        highlightthickness=0, bd=0, cursor="hand2")
         self.account_avatar.pack(side="left")
-        self.account_avatar_item = self.account_avatar.create_image(12, 12, anchor="center", image="")
+        self.account_avatar_item = self.account_avatar.create_image(17, 17, anchor="center", image="")
         self.account_avatar_fallback = self.account_avatar.create_text(
-            12, 12, text=self._avatar_initials(user_info), fill=TEXT,
-            font=("Segoe UI", 8, "bold"), anchor="center"
+            17, 17, text=self._avatar_initials(user_info), fill=TEXT,
+            font=("Segoe UI", 9, "bold"), anchor="center"
         )
         self.account_avatar.bind("<Button-1>", lambda _event: self.toggle_account_menu())
         self.account_avatar_image = None
@@ -1354,18 +1354,22 @@ class QuestCompleterApp:
             return
         try:
             image = Image.open(io.BytesIO(raw)).convert("RGBA")
-            image = ImageOps.fit(image, (24, 24), Image.Resampling.LANCZOS)
-            mask = Image.new("L", (24, 24), 0)
-            ImageDraw.Draw(mask).ellipse((0, 0, 23, 23), fill=255)
+            image = ImageOps.fit(image, (34, 34), Image.Resampling.LANCZOS)
+            mask = Image.new("L", (34, 34), 0)
+            ImageDraw.Draw(mask).ellipse((0, 0, 33, 33), fill=255)
             image.putalpha(mask)
             self.account_avatar_image = ImageTk.PhotoImage(image, master=self.root)
-            thumb = ImageOps.fit(image.convert("RGBA"), (24, 24), Image.Resampling.LANCZOS)
-            thumb_mask = Image.new("L", (24, 24), 0)
-            ImageDraw.Draw(thumb_mask).ellipse((0, 0, 23, 23), fill=255)
+            thumb = ImageOps.fit(image.convert("RGBA"), (20, 20), Image.Resampling.LANCZOS)
+            thumb_mask = Image.new("L", (20, 20), 0)
+            ImageDraw.Draw(thumb_mask).ellipse((0, 0, 19, 19), fill=255)
             thumb.putalpha(thumb_mask)
             self.account_avatar_thumb_image = ImageTk.PhotoImage(thumb, master=self.root)
             self.account_avatar.itemconfigure(self.account_avatar_item, image=self.account_avatar_image, state="normal")
             self.account_avatar.itemconfigure(self.account_avatar_fallback, state="hidden")
+            popup = getattr(self, "account_popup_avatar", None)
+            if popup and popup.winfo_exists():
+                popup.itemconfigure(self.account_popup_image_item, image=self.account_avatar_thumb_image, state="normal")
+                popup.itemconfigure(self.account_popup_fallback, state="hidden")
         except (OSError, tk.TclError):
             pass
 
@@ -1385,14 +1389,20 @@ class QuestCompleterApp:
         surface.pack(fill="both", expand=True)
         content = surface.content
         user_info = load_discord_session().get("user") or {}
-        top = tk.Frame(content, bg=PANEL)
+        top = tk.Frame(content, bg=PANEL, height=28)
         top.pack(fill="x", padx=12, pady=(12, 8))
-        popup_avatar = tk.Label(top, text=self._avatar_initials(user_info), bg=PANEL, fg=TEXT,
-                                font=("Segoe UI", 8, "bold"), width=3, height=1,
-                                highlightthickness=0, bd=0)
+        top.pack_propagate(False)
+        popup_avatar = tk.Canvas(top, width=20, height=20, bg=PANEL, highlightthickness=0, bd=0)
         popup_avatar.pack(side="left")
+        self.account_popup_avatar = popup_avatar
+        self.account_popup_image_item = popup_avatar.create_image(10, 10, anchor="center", image="")
+        self.account_popup_fallback = popup_avatar.create_text(
+            10, 10, text=self._avatar_initials(user_info), fill=TEXT,
+            font=("Segoe UI", 7, "bold"), anchor="center"
+        )
         if getattr(self, "account_avatar_thumb_image", None):
-            popup_avatar.configure(image=self.account_avatar_thumb_image)
+            popup_avatar.itemconfigure(self.account_popup_image_item, image=self.account_avatar_thumb_image, state="normal")
+            popup_avatar.itemconfigure(self.account_popup_fallback, state="hidden")
         username = str(user_info.get("global_name") or user_info.get("username") or "Discord user")
         tk.Label(top, text=username, bg=PANEL, fg=TEXT, font=("Segoe UI", 9, "bold"),
                  anchor="w").pack(side="left", fill="x", expand=True, padx=(9, 0))
