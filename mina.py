@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.1.7"
+VERSION = "0.1.8"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -809,6 +809,12 @@ class QuestCompleterApp:
         self.root.after(100, self.start_startup_gate)
 
     def _clear_root(self) -> None:
+        if getattr(self, "splash_job", None):
+            try:
+                self.root.after_cancel(self.splash_job)
+            except tk.TclError:
+                pass
+            self.splash_job = None
         for widget in self.root.winfo_children():
             widget.destroy()
 
@@ -877,17 +883,45 @@ class QuestCompleterApp:
         self._auth_footer()
         self._enable_feedback_tree(self.root)
 
+    def build_splash_screen(self) -> None:
+        self._clear_root()
+        self.auth_screen = "splash"
+        self.splash_angle = 0
+        self.splash_panel = tk.Frame(self.root, bg=BG)
+        self.splash_panel.pack(fill="both", expand=True)
+        center = tk.Frame(self.splash_panel, bg=BG)
+        center.place(relx=0.5, rely=0.5, anchor="center")
+        self._add_panel_logo(center, 180)
+        tk.Label(center, text="Welcom To SB3 Tool", bg=BG, fg=TEXT,
+                 font=("Segoe UI", 20, "bold")).pack(pady=(8, 24))
+        self.splash_loader = tk.Canvas(center, width=58, height=58, bg=BG, highlightthickness=0, bd=0)
+        self.splash_loader.pack()
+        self.splash_loader.create_oval(5, 5, 53, 53, outline=BORDER, width=5)
+        self.splash_arc = self.splash_loader.create_arc(5, 5, 53, 53, start=0, extent=95,
+                                                        outline=RED_HOVER, width=5, style="arc")
+        self._animate_splash()
+
+    def _animate_splash(self) -> None:
+        if self.auth_screen != "splash":
+            return
+        try:
+            self.splash_angle = (self.splash_angle + 12) % 360
+            self.splash_loader.itemconfigure(self.splash_arc, start=self.splash_angle)
+            self.splash_job = self.root.after(35, self._animate_splash)
+        except tk.TclError:
+            self.splash_job = None
+
     def start_auth_gate(self) -> None:
         self.auth_busy = True
-        self.build_login_screen(self.tr("checking_session"))
-        self.auth_button.configure(state="disabled")
+        if self.auth_screen != "splash":
+            self.build_login_screen(self.tr("checking_session"))
+            self.auth_button.configure(state="disabled")
         threading.Thread(target=self._auth_check_worker, daemon=True, name="sb3-auth-check").start()
 
     def start_startup_gate(self) -> None:
         """Check the update manifest before showing Discord login."""
         self.auth_busy = True
-        self.build_login_screen(self.tr("checking_updates"))
-        self.auth_button.configure(state="disabled")
+        self.build_splash_screen()
         threading.Thread(target=self._startup_update_worker, daemon=True, name="sb3-startup-update").start()
 
     def _startup_update_worker(self) -> None:
