@@ -20,7 +20,7 @@ import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, quote, urlencode, urlparse
 
 try:
     import tkinter as tk
@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -107,10 +107,10 @@ UI_TEXT = {
         "join_support": "Join Discord server", "logout": "Sign out",
         "auth_subtitle": "Discord access required", "login_title": "Sign in with Discord",
         "login_message": "Sign in with your Discord account to continue.", "login_button": "Sign in with Discord",
-        "checking_session": "Checking saved Discord session...", "checking_updates": "Checking for updates...",
+        "checking_session": "Checking saved Discord session...", "checking_updates": "Checking for updates...", "human_check_failed": "Cloudflare verification failed. Please try again.",
         "membership_subtitle": "Discord server access", "membership_title": "To use the app, join the SB3 server",
         "membership_message": "Click the button, join the server, then return to the app.",
-        "membership_error": "There was an error joining. Please try again.", "join_button": "Join the server",
+        "membership_error": "There was an error joining. Please try again.", "join_button": "Join the server", "refresh_membership": "Refresh",
         "update_subtitle": "Application update", "update_title": "A new update is available",
         "current_version": "Current version: {version}", "new_version": "New version: {version}",
         "update_button": "Update now", "downloading_update": "Downloading update...",
@@ -142,10 +142,10 @@ UI_TEXT = {
         "join_support": "انضم إلى سيرفر Discord", "logout": "تسجيل الخروج",
         "auth_subtitle": "تسجيل الدخول عبر Discord", "login_title": "تسجيل الدخول عبر Discord",
         "login_message": "سجّل دخولك بحساب Discord للمتابعة إلى الأداة.", "login_button": "تسجيل الدخول عبر Discord",
-        "checking_session": "جارٍ فحص جلسة Discord المحفوظة...", "checking_updates": "جارٍ فحص التحديثات...",
+        "checking_session": "جارٍ فحص جلسة Discord المحفوظة...", "checking_updates": "جارٍ فحص التحديثات...", "human_check_failed": "فشل تحقق Cloudflare، يرجى المحاولة مرة أخرى.",
         "membership_subtitle": "الوصول إلى سيرفر Discord", "membership_title": "لاستخدام الأداة يجب عليك الانضمام إلى سيرفر SB3",
         "membership_message": "اضغط الزر، انضم إلى السيرفر، ثم ارجع إلى الأداة.",
-        "membership_error": "حدث خطأ في الانضمام، يرجى المحاولة مرة أخرى.", "join_button": "انضمام إلى السيرفر",
+        "membership_error": "حدث خطأ في الانضمام، يرجى المحاولة مرة أخرى.", "join_button": "انضمام إلى السيرفر", "refresh_membership": "تحديث",
         "update_subtitle": "تحديث التطبيق", "update_title": "يتوفر تحديث جديد",
         "current_version": "النسخة الحالية: {version}", "new_version": "النسخة الجديدة: {version}",
         "update_button": "تحديث الآن", "downloading_update": "جارٍ تنزيل التحديث...",
@@ -426,6 +426,66 @@ def worker_json_post(endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
         return {}
     return data
+
+
+def turnstile_check() -> bool:
+    """Run Cloudflare Turnstile in the embedded WebView before startup checks."""
+    if not requests or not webview:
+        return False
+    try:
+        config = requests.get(f"{DISCORD_AUTH_WORKER_URL}/turnstile/config", timeout=(5, 15)).json()
+        if not config.get("ok") or not config.get("site_key"):
+            return False
+    except Exception:
+        return False
+    token_queue: queue.Queue[str] = queue.Queue()
+    callback_server: http.server.HTTPServer | None = None
+
+    def close_window() -> None:
+        try:
+            for window in list(webview.windows):
+                window.destroy()
+        except Exception:
+            pass
+
+    class TurnstileHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            token = str((parse_qs(urlparse(self.path).query).get("token") or [""])[0])
+            if token:
+                token_queue.put(token)
+            body = b"<!doctype html><html><body style='background:#0e080a'></body></html>"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            threading.Timer(0.15, close_window).start()
+
+        def log_message(self, _format: str, *_args: Any) -> None:
+            return
+
+    try:
+        callback_server = http.server.HTTPServer(("127.0.0.1", 0), TurnstileHandler)
+        callback_port = callback_server.server_address[1]
+        callback_url = f"http://127.0.0.1:{callback_port}/callback"
+        page_url = f"{DISCORD_AUTH_WORKER_URL}/turnstile/page?callback={quote(callback_url, safe='')}"
+        callback_thread = threading.Thread(target=callback_server.handle_request, daemon=True)
+        callback_thread.start()
+        webview.create_window("SB3 Verification", page_url, width=330, height=180,
+                              resizable=False, min_size=(300, 150))
+        webview.start(gui="edgechromium", debug=False)
+        callback_thread.join(timeout=5)
+        token = token_queue.get_nowait()
+        result = worker_json_post("/turnstile/verify", {"token": token})
+        return bool(result.get("ok"))
+    except Exception:
+        return False
+    finally:
+        if callback_server:
+            try:
+                callback_server.server_close()
+            except OSError:
+                pass
 
 
 def check_saved_discord_session() -> tuple[bool, str]:
@@ -901,6 +961,12 @@ class QuestCompleterApp:
         self.auth_button = PillButton(content, text=self.tr("join_button"), command=self.join_and_recheck,
                                       fill=RED, hover_fill=RED_HOVER, width=220, height=42, background=PANEL)
         self.auth_button.pack(pady=6)
+        if getattr(self, "membership_join_pressed", False):
+            self.refresh_membership_button = PillButton(content, text=self.tr("refresh_membership"),
+                                                        command=self.refresh_membership,
+                                                        fill=CARD, hover_fill=CARD_HOVER, text_color=TEXT,
+                                                        width=220, height=38, background=PANEL)
+            self.refresh_membership_button.pack(pady=(2, 6))
         self.auth_screen = "membership"
         self._auth_footer()
         self._enable_feedback_tree(self.root)
@@ -944,7 +1010,17 @@ class QuestCompleterApp:
         """Check the update manifest before showing Discord login."""
         self.auth_busy = True
         self.build_splash_screen()
+        threading.Thread(target=self._startup_security_worker, daemon=True, name="sb3-startup-turnstile").start()
+
+    def _startup_security_worker(self) -> None:
+        if not turnstile_check():
+            self.root.after(0, self._turnstile_failed)
+            return
         threading.Thread(target=self._startup_update_worker, daemon=True, name="sb3-startup-update").start()
+
+    def _turnstile_failed(self) -> None:
+        messagebox.showerror("Cloudflare", self.tr("human_check_failed"), parent=self.root)
+        self.start_startup_gate()
 
     def _startup_update_worker(self) -> None:
         if not UPDATE_MANIFEST_URL or not requests:
@@ -989,10 +1065,25 @@ class QuestCompleterApp:
         self.auth_busy = False
 
     def join_and_recheck(self) -> None:
+        self.membership_join_pressed = True
+        self.build_membership_screen()
         webbrowser.open_new_tab(SUPPORT_DISCORD_URL)
         if not self.membership_watch_active:
             self.membership_watch_active = True
             threading.Thread(target=self._membership_worker, daemon=True, name="sb3-membership-check").start()
+
+    def refresh_membership(self) -> None:
+        """Manually refresh the saved Discord session and membership state."""
+        if self.auth_busy:
+            return
+        self.auth_busy = True
+        self.build_membership_screen()
+        threading.Thread(target=self._refresh_membership_worker, daemon=True, name="sb3-membership-refresh").start()
+
+    def _refresh_membership_worker(self) -> None:
+        valid, _reason = check_saved_discord_session()
+        self.root.after(0, lambda: self._finish_membership_check(valid))
+        self.auth_busy = False
 
     def _membership_worker(self) -> None:
         valid = False
@@ -1005,7 +1096,9 @@ class QuestCompleterApp:
 
     def _finish_membership_check(self, valid: bool) -> None:
         self.membership_watch_active = False
+        self.auth_busy = False
         if valid:
+            self.membership_join_pressed = False
             self.open_main_interface()
         else:
             self.build_membership_screen(error=True)
@@ -2144,7 +2237,7 @@ class QuestCompleterApp:
                                     background=CARD, command=lambda key=qid: self.stop_single_simulation(key))
             else:
                 action = PillButton(row, text=self.tr("run"), fill=RED, hover_fill=RED_HOVER, width=58, height=30,
-                                    background=CARD, command=lambda item=quest: self.open_platform_selector(item))
+                                    background=CARD, command=lambda item=quest: self.run_best_platform(item))
             action.pack(side="right", padx=(1, 4), pady=15)
             remove = PillButton(row, text="×", fill=CARD, hover_fill=CARD_HOVER, text_color=TEXT_DIM,
                                 font=("Segoe UI", 13), width=30, height=30, background=CARD,
@@ -2161,20 +2254,17 @@ class QuestCompleterApp:
         self.render_queue()
 
     def open_platform_selector(self, quest: dict[str, Any]) -> None:
+        """Compatibility entry point: run Discord's first verified/recommended launcher."""
+        self.run_best_platform(quest)
+
+    def run_best_platform(self, quest: dict[str, Any]) -> None:
         platforms = platforms_for_game(quest) or tuple(quest.get("_platforms") or ())
         if not platforms:
             messagebox.showinfo(self.tr("no_launcher_title"), self.tr("no_launcher_message", name=quest["_public_name"]))
             return
-        panel = self._show_in_app_panel(self.tr("available_platforms"), 210 + 48 * len(platforms))
-        tk.Label(panel, text=self.tr("choose_launcher"), bg=PANEL, fg=MUTED, font=("Segoe UI", 8, "bold"),
-                 justify="center").pack(pady=(0, 5))
-        tk.Label(panel, text=quest["_public_name"], bg=PANEL, fg=TEXT_DIM, font=("Segoe UI", 10),
-                 wraplength=300, justify="center").pack(pady=(0, 15))
-        for platform in platforms:
-            button = PillButton(panel, text=platform, fill=CARD, hover_fill=RED, text_color=TEXT,
-                                width=292, height=38, background=PANEL,
-                                command=lambda selected=platform: self._start_from_in_app_panel(quest, selected))
-            button.pack(pady=4)
+        # PLATFORM_ORDER is Discord's verified-launcher priority. The first detected
+        # launcher is therefore selected silently, without interrupting Run.
+        self.start_single_simulation(quest, platforms[0])
 
     def _start_from_in_app_panel(self, quest: dict[str, Any], platform: str) -> None:
         self._close_in_app_panel()
