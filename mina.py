@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1048,7 +1048,7 @@ class QuestCompleterApp:
         self.update_status = tk.Label(content, text="", bg=PANEL, fg=TEXT_DIM,
                                       font=("Segoe UI", 9), wraplength=350, justify="center")
         self.update_status.pack(pady=(0, 12))
-        size_value = manifest.get("size")
+        size_value = manifest.get("package_size") or manifest.get("size")
         try:
             size_text = self._format_download_size(float(size_value)) if size_value else "--"
         except (TypeError, ValueError):
@@ -1135,14 +1135,14 @@ class QuestCompleterApp:
     def _download_update_worker(self) -> None:
         manifest = self.latest_manifest or {}
         try:
-            installer_url = str(manifest["installer_url"])
+            package_url = str(manifest.get("package_url") or manifest["installer_url"])
             latest = str(manifest["version"])
-            download = requests.get(installer_url, headers=HEADERS, timeout=(10, 120), stream=True)
+            download = requests.get(package_url, timeout=(10, 120), stream=True)
             download.raise_for_status()
             total = int(download.headers.get("content-length") or 0)
             received = 0
             started = time.monotonic()
-            suffix = Path(installer_url.split("?", 1)[0]).suffix or ".exe"
+            suffix = Path(package_url.split("?", 1)[0]).suffix or ".zip"
             temp_path = Path(tempfile.gettempdir()) / f"SB3QuestCompleter-update-{latest}{suffix}"
             self.update_temp_path = temp_path
             with temp_path.open("wb") as target:
@@ -1164,7 +1164,7 @@ class QuestCompleterApp:
                 except OSError: pass
                 self.root.after(0, self._update_cancelled)
                 return
-            expected_hash = str(manifest.get("sha256", "")).strip().casefold()
+            expected_hash = str(manifest.get("package_sha256") or manifest.get("sha256", "")).strip().casefold()
             if expected_hash:
                 digest = hashlib.sha256(temp_path.read_bytes()).hexdigest().casefold()
                 if digest != expected_hash:
@@ -1178,10 +1178,14 @@ class QuestCompleterApp:
                 return
             self.root.after(0, self._render_download_progress, max(received, total), total, max(0.0, received / max(0.001, time.monotonic() - started)), 0.0)
             self.root.after(0, lambda: self.update_status.configure(text=self.tr("launching_update")))
-            subprocess.Popen([
-                str(temp_path), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
-                "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS", "/TASKS=",
-            ])
+            install_dir = Path(sys.executable).resolve().parent
+            app_path = Path(sys.executable).resolve()
+            updater_path = install_dir / "SB3Updater.exe"
+            if not updater_path.exists():
+                updater_path = resource_path("SB3Updater.exe")
+            if not updater_path.exists():
+                raise FileNotFoundError("SB3Updater.exe is missing")
+            subprocess.Popen([str(updater_path), str(temp_path), str(install_dir), str(os.getpid()), str(app_path)])
             self.root.after(50, self._exit_for_update)
         except Exception:
             temp_path = self.update_temp_path

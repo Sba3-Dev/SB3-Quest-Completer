@@ -48,6 +48,21 @@ jobs:
           --add-data "%CD%\logo.ico;." --add-data "%CD%\assets;assets"
           --distpath dist --workpath build --specpath build mina.py
 
+      - name: Build silent updater
+        shell: cmd
+        run: >-
+          python -m PyInstaller --noconfirm --clean --onefile --console
+          --name SB3Updater --distpath dist --workpath build-updater --specpath build-updater updater.py
+
+      - name: Create update ZIP
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force update-package | Out-Null
+          Copy-Item dist\SB3QuestCompleter.exe update-package\SB3QuestCompleter.exe -Force
+          Copy-Item logo.ico update-package\logo.ico -Force
+          Copy-Item assets update-package\assets -Recurse -Force
+          Compress-Archive -Path update-package\* -DestinationPath SB3QuestCompleter-Update.zip -Force
+
       - name: Build Setup.exe
         shell: pwsh
         run: |
@@ -61,7 +76,8 @@ jobs:
         shell: pwsh
         run: |
           gh release upload "${{ github.event.release.tag_name }}" `
-            "installer-output/SB3QuestCompleter-Setup.exe" --clobber
+            "installer-output/SB3QuestCompleter-Setup.exe" `
+            "SB3QuestCompleter-Update.zip" --clobber
 
       - name: Publish update manifest
         if: github.event_name == 'release'
@@ -73,11 +89,16 @@ jobs:
           $version = $env:RELEASE_TAG.TrimStart('v')
           $hash = (Get-FileHash "installer-output/SB3QuestCompleter-Setup.exe" -Algorithm SHA256).Hash.ToLower()
           $size = (Get-Item "installer-output/SB3QuestCompleter-Setup.exe").Length
+          $packageHash = (Get-FileHash "SB3QuestCompleter-Update.zip" -Algorithm SHA256).Hash.ToLower()
+          $packageSize = (Get-Item "SB3QuestCompleter-Update.zip").Length
           $manifest = @{
             version = $version
             installer_url = "https://github.com/$($env:REPOSITORY)/releases/download/$($env:RELEASE_TAG)/SB3QuestCompleter-Setup.exe"
             sha256 = $hash
             size = $size
+            package_url = "https://github.com/$($env:REPOSITORY)/releases/download/$($env:RELEASE_TAG)/SB3QuestCompleter-Update.zip"
+            package_sha256 = $packageHash
+            package_size = $packageSize
           } | ConvertTo-Json
           Set-Content update.json $manifest -Encoding UTF8
           git config user.name "github-actions[bot]"
