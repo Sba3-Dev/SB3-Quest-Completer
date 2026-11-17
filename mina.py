@@ -40,7 +40,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.0.7"
+VERSION = "0.0.8"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -426,7 +426,11 @@ def discord_login() -> tuple[bool, str]:
             returned_state = str((params.get("state") or [""])[0])
             error = str((params.get("error") or [""])[0])
             result_queue.put((code if returned_state == state else "", error or "state_error" if returned_state != state else ""))
-            body = b"<html><body><h2>Discord login complete</h2><p>You can close this window and return to SB3 Quest Completer.</p></body></html>"
+            body = '''<!doctype html><html><head><meta charset="utf-8"><title>SB3</title></head>
+            <body><script>
+            try { window.open('', '_self'); window.close(); } catch (e) {}
+            setTimeout(function(){ document.body.innerHTML = '<p>تم تسجيل الدخول. يمكنك إغلاق هذه الصفحة.</p>'; }, 400);
+            </script><p>تم تسجيل الدخول، جارٍ الرجوع إلى الأداة...</p></body></html>'''.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -750,6 +754,7 @@ class QuestCompleterApp:
         self.featured_ranks = self.load_featured_ranks()
         self.auth_busy = False
         self.latest_manifest: dict[str, Any] | None = None
+        self.auth_screen = "login"
         self.root.after(100, self.start_auth_gate)
 
     def _clear_root(self) -> None:
@@ -770,6 +775,14 @@ class QuestCompleterApp:
         tk.Label(labels, text=APP_NAME, bg=BG, fg=TEXT, font=("Segoe UI", 19, "bold")).pack(anchor="w")
         tk.Label(labels, text=subtitle, bg=BG, fg=TEXT_DIM, font=("Segoe UI", 9)).pack(anchor="w", pady=(3, 0))
 
+    def _auth_footer(self) -> None:
+        footer = tk.Frame(self.root, bg=BG)
+        footer.pack(fill="x", padx=30, pady=(0, 16))
+        settings_button = PillButton(footer, text="⚙", command=self.open_settings_panel, fill=INPUT,
+                                     hover_fill=CARD_HOVER, text_color=TEXT_DIM, font=("Segoe UI Symbol", 15),
+                                     width=38, height=34, background=BG)
+        settings_button.pack(side="right")
+
     def build_login_screen(self, note: str = "") -> None:
         self._clear_root()
         self._auth_header("Discord access required")
@@ -787,6 +800,8 @@ class QuestCompleterApp:
         self.auth_button = PillButton(content, text="تسجيل الدخول عبر Discord", command=self.start_discord_login,
                                       fill=RED, hover_fill=RED_HOVER, width=250, height=42, background=PANEL)
         self.auth_button.pack(pady=6)
+        self.auth_screen = "login"
+        self._auth_footer()
         self._enable_feedback_tree(self.root)
 
     def build_membership_screen(self, error: bool = False) -> None:
@@ -807,10 +822,14 @@ class QuestCompleterApp:
         self.auth_button = PillButton(content, text="انضمام إلى السيرفر", command=self.join_and_recheck,
                                       fill=RED, hover_fill=RED_HOVER, width=220, height=42, background=PANEL)
         self.auth_button.pack(pady=6)
+        self.auth_screen = "membership"
+        self._auth_footer()
         self._enable_feedback_tree(self.root)
 
     def start_auth_gate(self) -> None:
+        self.auth_busy = True
         self.build_login_screen("جارٍ فحص جلسة Discord المحفوظة...")
+        self.auth_button.configure(state="disabled")
         threading.Thread(target=self._auth_check_worker, daemon=True, name="sb3-auth-check").start()
 
     def _auth_check_worker(self) -> None:
@@ -818,6 +837,7 @@ class QuestCompleterApp:
         self.root.after(0, lambda: self._finish_auth_check(valid, reason))
 
     def _finish_auth_check(self, valid: bool, reason: str) -> None:
+        self.auth_busy = False
         if valid:
             self.open_main_interface()
         elif reason == "not_in_guild":
@@ -865,6 +885,8 @@ class QuestCompleterApp:
 
     def open_main_interface(self) -> None:
         self.auth_busy = False
+        self.auth_screen = "main"
+        self._clear_root()
         self.build_ui()
         self._enable_feedback_tree(self.root)
         self.start_monitor()
@@ -903,6 +925,7 @@ class QuestCompleterApp:
         self.latest_manifest = manifest
         latest = str(manifest.get("version", "")).strip()
         self._clear_root()
+        self.auth_screen = "update"
         self._auth_header("Application update")
         surface = RoundedSurface(self.root, fill=PANEL, radius=24, width=520, height=420, background=BG)
         surface.pack(fill="both", expand=True, padx=260, pady=(35, 75))
@@ -922,6 +945,7 @@ class QuestCompleterApp:
         self.update_button = PillButton(content, text="تحديث الآن", command=self.install_latest_update,
                                         fill=RED, hover_fill=RED_HOVER, width=190, height=42, background=PANEL)
         self.update_button.pack(pady=6)
+        self._auth_footer()
         self._enable_feedback_tree(self.root)
 
     def install_latest_update(self) -> None:
@@ -1393,6 +1417,15 @@ class QuestCompleterApp:
 
     def _rebuild_interface(self) -> None:
         """Rebuild the visual layer so saved appearance choices apply consistently."""
+        if self.auth_screen == "login":
+            self.build_login_screen()
+            return
+        if self.auth_screen == "membership":
+            self.build_membership_screen()
+            return
+        if self.auth_screen == "update" and self.latest_manifest:
+            self.show_update_screen(self.latest_manifest)
+            return
         query = self.search_var.get() if hasattr(self, "search_var") else ""
         if self.spinner_job:
             try:
