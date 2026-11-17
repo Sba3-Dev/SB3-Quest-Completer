@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -549,12 +549,14 @@ def discord_login() -> tuple[bool, str]:
         result = worker_json_post("/oauth/exchange", {"code": code, "redirect_uri": DISCORD_REDIRECT_URI})
     except Exception:
         return False, "network"
-    if result.get("ok") and result.get("member") and result.get("refresh_token"):
+    if result.get("refresh_token"):
         save_discord_session({"refresh_token": result["refresh_token"],
                               "access_token": result.get("access_token") or "",
                               "guild_id": DISCORD_GUILD_ID,
                               "user": result.get("user") or {}})
-        return True, "ok"
+        if result.get("ok") and result.get("member"):
+            return True, "ok"
+        return False, str(result.get("error") or "not_in_guild")
     return False, str(result.get("error") or "not_in_guild")
 
 
