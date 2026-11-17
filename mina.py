@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -474,7 +474,7 @@ def discord_login() -> tuple[bool, str]:
             .logo{{width:88px;height:88px;object-fit:contain;margin-bottom:18px}}.logo-fallback{{font-size:32px;font-weight:700;color:#a7474d;margin-bottom:18px}}
             h1{{font-size:20px;margin:0 0 12px}}p{{color:#ccb8bc;font-size:14px;margin:0 0 24px}}button{{border:0;border-radius:12px;padding:13px 24px;background:#a7474d;color:white;font-size:14px;cursor:pointer}}button:hover{{background:#b9585e}}</style></head>
             <body><main class="card">{icon_html}<h1>{title}</h1><p>{message}</p><button onclick="closeAndReturn()">{button}</button></main>
-            <script>function closeAndReturn(){{try{{window.open('', '_self');window.close();}}catch(e){{}}}}
+            <script>function closeAndReturn(){{window.close();try{{window.open('', '_self');window.close();}}catch(e){{}}}}
             setTimeout(closeAndReturn, 650);</script></body></html>'''.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -1183,8 +1183,6 @@ class QuestCompleterApp:
         labels.pack(side="left", fill="x", expand=True)
         tk.Label(labels, text=APP_NAME, bg=BG, fg=TEXT, font=("Segoe UI", 19, "bold")).pack(anchor="w")
         tk.Label(labels, text="Sba3 Dev - 2026", bg=BG, fg=TEXT_DIM, font=("Segoe UI", 9)).pack(anchor="w", pady=(3, 0))
-        self.library_count = tk.Label(header, text=self.tr("library_loading"), bg=BG, fg=MUTED, font=("Segoe UI", 9, "bold"))
-        self.library_count.pack(side="right", pady=(10, 0))
         body = tk.Frame(self.root, bg=BG)
         body.pack(fill="both", expand=True, padx=28, pady=(0, 14))
         body.grid_columnconfigure(0, weight=3, minsize=570)
@@ -1202,12 +1200,16 @@ class QuestCompleterApp:
         footer.pack(fill="x", padx=30, pady=(0, 16))
         self.status = tk.Label(footer, text=self.tr("ready"), bg=BG, fg=MUTED, font=("Segoe UI", 9, "bold"), anchor="w")
         self.status.pack(side="left")
+        self.library_count = tk.Label(footer, text=self.tr("featured_games"), bg=BG, fg=TEXT_DIM,
+                                      font=("Segoe UI", 9, "bold"), anchor="e")
+        self.library_count.pack(side="right")
 
     def build_account_widget(self, parent: tk.Frame) -> None:
         account = tk.Frame(parent, bg=BG)
         account.pack(side="right", padx=(18, 0))
-        self.account_avatar = tk.Label(account, text="?", bg=CARD, fg=TEXT,
-                                       font=("Segoe UI", 18, "bold"), width=4, height=2, cursor="hand2")
+        self.account_avatar = tk.Label(account, text="?", bg=BG, fg=TEXT,
+                                       font=("Segoe UI", 18, "bold"), width=4, height=2,
+                                       highlightthickness=0, bd=0, cursor="hand2")
         self.account_avatar.pack(side="left")
         self.account_avatar.bind("<Button-1>", lambda _event: self.toggle_account_menu())
         user_info = load_discord_session().get("user") or {}
@@ -1242,9 +1244,9 @@ class QuestCompleterApp:
             return
         try:
             image = Image.open(io.BytesIO(raw)).convert("RGBA")
-            image = ImageOps.fit(image, (72, 72), Image.Resampling.LANCZOS)
-            mask = Image.new("L", (72, 72), 0)
-            ImageDraw.Draw(mask).ellipse((0, 0, 71, 71), fill=255)
+            image = ImageOps.fit(image, (64, 64), Image.Resampling.LANCZOS)
+            mask = Image.new("L", (64, 64), 0)
+            ImageDraw.Draw(mask).ellipse((0, 0, 63, 63), fill=255)
             image.putalpha(mask)
             self.account_avatar_image = ImageTk.PhotoImage(image)
             self.account_avatar.configure(image=self.account_avatar_image, text="")
@@ -1257,9 +1259,9 @@ class QuestCompleterApp:
             self.account_menu = None
             return
         self.root.update_idletasks()
-        menu = tk.Frame(self.root, bg=PANEL, highlightthickness=1, highlightbackground=BORDER)
-        x = max(8, self.account_avatar.winfo_rootx() - self.root.winfo_rootx() - 142)
-        y = self.account_avatar.winfo_rooty() - self.root.winfo_rooty() + self.account_avatar.winfo_height() + 8
+        menu = tk.Frame(self.root, bg=BG, highlightthickness=0, bd=0)
+        x = max(8, self.account_avatar.winfo_rootx() - self.root.winfo_rootx() - 228)
+        y = max(8, self.account_avatar.winfo_rooty() - self.root.winfo_rooty())
         menu.place(x=x, y=y, width=220, height=205)
         menu.lift()
         self.account_menu = menu
@@ -1269,7 +1271,8 @@ class QuestCompleterApp:
         user_info = load_discord_session().get("user") or {}
         top = tk.Frame(content, bg=PANEL)
         top.pack(fill="x", padx=12, pady=(12, 8))
-        popup_avatar = tk.Label(top, bg=CARD, fg=TEXT, font=("Segoe UI", 12, "bold"), width=3, height=1)
+        popup_avatar = tk.Label(top, bg=PANEL, fg=TEXT, font=("Segoe UI", 12, "bold"), width=3, height=1,
+                                highlightthickness=0, bd=0)
         popup_avatar.pack(side="left")
         if self.account_avatar_image:
             popup_avatar.configure(image=self.account_avatar_image)
@@ -1399,7 +1402,6 @@ class QuestCompleterApp:
     def build_library(self) -> None:
         top = tk.Frame(self.library_panel, bg=PANEL)
         top.pack(fill="x", padx=22, pady=(20, 10))
-        tk.Label(top, text=self.tr("featured_games"), bg=PANEL, fg=TEXT, font=("Segoe UI", 12, "bold")).pack(side="right")
         self.results = tk.Label(top, text=self.tr("preparing_library"), bg=PANEL, fg=MUTED, font=("Segoe UI", 9))
         self.results.pack(side="left")
         self.search_var = tk.StringVar()
