@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1217,6 +1217,7 @@ class QuestCompleterApp:
         self.account_avatar.bind("<Button-1>", lambda _event: self.toggle_account_menu())
         user_info = load_discord_session().get("user") or {}
         self.account_avatar_image = None
+        self.account_avatar_thumb_image = None
         self.load_account_avatar(user_info)
 
     def load_account_avatar(self, user: dict[str, Any]) -> None:
@@ -1225,7 +1226,7 @@ class QuestCompleterApp:
         if not requests or not user_id:
             return
         if avatar_hash:
-            url = f"https://cdn.discordapp.com/avatars/{user_id}/{avatar_hash}.png?size=128"
+            url = f"https://cdn.discordapp.com/avatars/{user_id}/{avatar_hash}.png?size=256"
         else:
             try:
                 url = f"https://cdn.discordapp.com/embed/avatars/{int(user_id) % 5}.png"
@@ -1247,11 +1248,16 @@ class QuestCompleterApp:
             return
         try:
             image = Image.open(io.BytesIO(raw)).convert("RGBA")
-            image = ImageOps.fit(image, (64, 64), Image.Resampling.LANCZOS)
-            mask = Image.new("L", (64, 64), 0)
-            ImageDraw.Draw(mask).ellipse((0, 0, 63, 63), fill=255)
+            image = ImageOps.fit(image, (256, 256), Image.Resampling.LANCZOS)
+            mask = Image.new("L", (256, 256), 0)
+            ImageDraw.Draw(mask).ellipse((0, 0, 255, 255), fill=255)
             image.putalpha(mask)
             self.account_avatar_image = ImageTk.PhotoImage(image)
+            thumb = ImageOps.fit(image.convert("RGBA"), (48, 48), Image.Resampling.LANCZOS)
+            thumb_mask = Image.new("L", (48, 48), 0)
+            ImageDraw.Draw(thumb_mask).ellipse((0, 0, 47, 47), fill=255)
+            thumb.putalpha(thumb_mask)
+            self.account_avatar_thumb_image = ImageTk.PhotoImage(thumb)
             self.account_avatar.configure(image=self.account_avatar_image, text="")
         except (OSError, tk.TclError):
             pass
@@ -1277,8 +1283,8 @@ class QuestCompleterApp:
         popup_avatar = tk.Label(top, bg=PANEL, fg=TEXT, font=("Segoe UI", 12, "bold"), width=3, height=1,
                                 highlightthickness=0, bd=0)
         popup_avatar.pack(side="left")
-        if self.account_avatar_image:
-            popup_avatar.configure(image=self.account_avatar_image)
+        if getattr(self, "account_avatar_thumb_image", None):
+            popup_avatar.configure(image=self.account_avatar_thumb_image)
         username = str(user_info.get("global_name") or user_info.get("username") or "Discord user")
         tk.Label(top, text=username, bg=PANEL, fg=TEXT, font=("Segoe UI", 9, "bold"),
                  anchor="w").pack(side="left", fill="x", expand=True, padx=(9, 0))
