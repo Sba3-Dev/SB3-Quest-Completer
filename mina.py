@@ -40,7 +40,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.0.8"
+VERSION = "0.0.9"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -755,7 +755,7 @@ class QuestCompleterApp:
         self.auth_busy = False
         self.latest_manifest: dict[str, Any] | None = None
         self.auth_screen = "login"
-        self.root.after(100, self.start_auth_gate)
+        self.root.after(100, self.start_startup_gate)
 
     def _clear_root(self) -> None:
         for widget in self.root.winfo_children():
@@ -831,6 +831,30 @@ class QuestCompleterApp:
         self.build_login_screen("جارٍ فحص جلسة Discord المحفوظة...")
         self.auth_button.configure(state="disabled")
         threading.Thread(target=self._auth_check_worker, daemon=True, name="sb3-auth-check").start()
+
+    def start_startup_gate(self) -> None:
+        """Check the update manifest before showing Discord login."""
+        self.auth_busy = True
+        self.build_login_screen("جارٍ فحص التحديثات...")
+        self.auth_button.configure(state="disabled")
+        threading.Thread(target=self._startup_update_worker, daemon=True, name="sb3-startup-update").start()
+
+    def _startup_update_worker(self) -> None:
+        if not UPDATE_MANIFEST_URL or not requests:
+            self.root.after(0, self.start_auth_gate)
+            return
+        try:
+            response = requests.get(UPDATE_MANIFEST_URL, headers=HEADERS, timeout=(5, 15))
+            response.raise_for_status()
+            manifest = response.json()
+            latest = str(manifest.get("version", "")).strip()
+            installer_url = str(manifest.get("installer_url", "")).strip()
+            if latest and installer_url and self._version_tuple(latest) > self._version_tuple(VERSION):
+                self.root.after(0, lambda: self.show_update_screen(manifest))
+                return
+        except Exception:
+            pass
+        self.root.after(0, self.start_auth_gate)
 
     def _auth_check_worker(self) -> None:
         valid, reason = check_saved_discord_session()
@@ -922,6 +946,7 @@ class QuestCompleterApp:
         self.root.after(0, lambda: self.show_update_screen(manifest))
 
     def show_update_screen(self, manifest: dict[str, Any]) -> None:
+        self.auth_busy = False
         self.latest_manifest = manifest
         latest = str(manifest.get("version", "")).strip()
         self._clear_root()
