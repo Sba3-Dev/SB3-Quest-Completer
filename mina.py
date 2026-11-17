@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.4.8"
+VERSION = "0.4.9"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1041,11 +1041,17 @@ class QuestCompleterApp:
             child_env.pop("_MEIPASS2", None)
             child_env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
             if os.name == "nt":
-                command_line = subprocess.list2cmdline(command)
-                restart_script = f'timeout /t 2 /nobreak >nul & start "" {command_line}'
+                app_path = Path(sys.executable if getattr(sys, "frozen", False) else command[1]).resolve()
+                install_dir = app_path.parent
+                updater_path = install_dir / "SB3Updater.exe"
+                if not updater_path.exists():
+                    updater_path = resource_path("SB3Updater.exe")
+                if not updater_path.exists():
+                    raise FileNotFoundError("SB3Updater.exe is missing")
                 flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-                subprocess.Popen(["cmd.exe", "/d", "/c", restart_script], cwd=cwd,
-                                 env=child_env, close_fds=False, creationflags=flags)
+                subprocess.Popen([str(updater_path), "--restart", str(os.getpid()), str(app_path)],
+                                 cwd=str(updater_path.parent), env=child_env,
+                                 close_fds=False, creationflags=flags)
             else:
                 subprocess.Popen(command, cwd=cwd, env=child_env, close_fds=False)
         except OSError:

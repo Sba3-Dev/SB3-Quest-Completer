@@ -49,7 +49,24 @@ def copy_tree(source: Path, target: Path) -> None:
             replace_file(item, destination)
 
 
+def restart_app(pid: int, app_path: Path) -> int:
+    """Restart a one-file PyInstaller app after its old process has fully exited."""
+    wait_for_process(pid)
+    time.sleep(1.0)
+    env = os.environ.copy()
+    env.pop("_MEIPASS2", None)
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    subprocess.Popen([str(app_path)], cwd=str(app_path.parent), env=env, close_fds=True)
+    return 0
+
+
 def main() -> int:
+    if len(sys.argv) == 4 and sys.argv[1] == "--restart":
+        try:
+            pid = int(sys.argv[2])
+        except ValueError:
+            pid = 0
+        return restart_app(pid, Path(sys.argv[3]).resolve())
     if len(sys.argv) < 5:
         return 2
     package = Path(sys.argv[1]).resolve()

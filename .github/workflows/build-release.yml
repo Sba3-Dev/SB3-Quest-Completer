@@ -59,6 +59,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force update-package | Out-Null
           Copy-Item dist\SB3QuestCompleter.exe update-package\SB3QuestCompleter.exe -Force
+          Copy-Item dist\SB3Updater.exe update-package\SB3Updater.exe -Force
           Copy-Item logo.ico update-package\logo.ico -Force
           Copy-Item assets update-package\assets -Recurse -Force
           Compress-Archive -Path update-package\* -DestinationPath SB3QuestCompleter-Update.zip -Force
