@@ -1,0 +1,356 @@
+[
+  {
+    "rank": 0,
+    "id": "1402418703554842694",
+    "name": "Fortnite",
+    "icon_hash": "c1864b38910c209afd5bf6423b672022"
+  },
+  {
+    "rank": 1,
+    "id": "1402418491272986635",
+    "name": "Minecraft",
+    "icon_hash": "166fbad351ecdd02d11a3b464748f66b"
+  },
+  {
+    "rank": 2,
+    "id": "363445589247131668",
+    "name": "ROBLOX",
+    "icon_hash": "f2b60e350a2097289b3b0b877495e55f"
+  },
+  {
+    "rank": 3,
+    "id": "700136079562375258",
+    "name": "VALORANT",
+    "icon_hash": "11f81959f4fdd76ca6c39c59eac256c1"
+  },
+  {
+    "rank": 4,
+    "id": "1402418696126992445",
+    "name": "League of Legends",
+    "icon_hash": "7c99428541032ac02ec6981d88b78fb7"
+  },
+  {
+    "rank": 5,
+    "id": "1158877933042143272",
+    "name": "Counter-Strike 2",
+    "icon_hash": "558f5a26ecb3b17c3dea3d15c1df537a"
+  },
+  {
+    "rank": 6,
+    "id": "356875988589740042",
+    "name": "Dota 2",
+    "icon_hash": "6b4b3fa4c83555d3008de69d33a60588"
+  },
+  {
+    "rank": 7,
+    "id": "1402418717781921935",
+    "name": "PUBG: BATTLEGROUNDS",
+    "icon_hash": "9d616d0c960ff87c3bc6beb9475362f5"
+  },
+  {
+    "rank": 8,
+    "id": "542075586886107149",
+    "name": "Apex Legends",
+    "icon_hash": "91fac0600c5b6527c1aea95a93c6a8e0"
+  },
+  {
+    "rank": 9,
+    "id": "356875221078245376",
+    "name": "Overwatch",
+    "icon_hash": "a60bb76ba4d4acafbd4cb9aad6e61739"
+  },
+  {
+    "rank": 10,
+    "id": "1402418714716143646",
+    "name": "Grand Theft Auto V",
+    "icon_hash": "b77111108195cd5e4dd2011dd39bf67d"
+  },
+  {
+    "rank": 11,
+    "id": "1445181071103627284",
+    "name": "Call of Duty",
+    "icon_hash": "ab7db0af5c0598f6d612353e852dec0d"
+  },
+  {
+    "rank": 12,
+    "id": "356877880938070016",
+    "name": "Rocket League",
+    "icon_hash": "a74899a5190c48a3e6ce9f8d2eaff348"
+  },
+  {
+    "rank": 13,
+    "id": "356876590342340608",
+    "name": "Rainbow Six Siege",
+    "icon_hash": "01125e693db476e6f83f7d9769080fd0"
+  },
+  {
+    "rank": 14,
+    "id": "357607133254254632",
+    "name": "Dead by Daylight",
+    "icon_hash": "64e7623c9af49f2e7dc7048df16b1013"
+  },
+  {
+    "rank": 15,
+    "id": "762434991303950386",
+    "name": "Genshin Impact",
+    "icon_hash": "0a7cc00267310bf4afdd78b175a7aeea"
+  },
+  {
+    "rank": 16,
+    "id": "1121201675240210523",
+    "name": "Honkai: Star Rail",
+    "icon_hash": "444d067889922e42b0af99b13e5d5c72"
+  },
+  {
+    "rank": 17,
+    "id": "1314395942253756416",
+    "name": "Marvel Rivals",
+    "icon_hash": "2dd7882b887306ab5afad03452869ad8"
+  },
+  {
+    "rank": 18,
+    "id": "1402418586244612216",
+    "name": "Warframe",
+    "icon_hash": "c78e17a5f91ac21d0c807b0c5f7d00a7"
+  },
+  {
+    "rank": 19,
+    "id": "372438022647578634",
+    "name": "Destiny 2",
+    "icon_hash": "876323877dd2f3e3fdfc1637a30eb356"
+  },
+  {
+    "rank": 20,
+    "id": "1182713227491147776",
+    "name": "THE FINALS",
+    "icon_hash": "b5e88216b2c5f93553c2d53bd859aff9"
+  },
+  {
+    "rank": 21,
+    "id": "1197827812623650866",
+    "name": "Palworld",
+    "icon_hash": "f2039761488809de552d44ebc6739ffe"
+  },
+  {
+    "rank": 22,
+    "id": "1402418594532298837",
+    "name": "Rust",
+    "icon_hash": "9ab7e18473429b016307b867e6c924a4"
+  },
+  {
+    "rank": 23,
+    "id": "1402418344912752671",
+    "name": "Terraria",
+    "icon_hash": "4c3c185abc0dfb4cb1ec5612de4d7366"
+  },
+  {
+    "rank": 24,
+    "id": "359509387670192128",
+    "name": "Stardew Valley",
+    "icon_hash": "1e84012079d438b46bbb3c3bf2a409bb"
+  },
+  {
+    "rank": 25,
+    "id": "1402418440685486130",
+    "name": "Among Us",
+    "icon_hash": "e6cf30ebdaf6e657f636f391b29f06f8"
+  },
+  {
+    "rank": 26,
+    "id": "1167674267748540516",
+    "name": "Lethal Company",
+    "icon_hash": "4f1ee29121b9a0f4dfcc4ce6bb9bd5af"
+  },
+  {
+    "rank": 27,
+    "id": "1205090671527071784",
+    "name": "HELLDIVERS 2",
+    "icon_hash": "6d49be66d5f2b88bdfc8cc7095abdbda"
+  },
+  {
+    "rank": 28,
+    "id": "1137125502985961543",
+    "name": "Baldur's Gate III",
+    "icon_hash": "3d6a6ddf065f232dc0d93af3050954ce"
+  },
+  {
+    "rank": 29,
+    "id": "1402418436809953330",
+    "name": "ELDEN RING",
+    "icon_hash": "0a0c0a0be069dddfc3f1fbede4e34bfd"
+  },
+  {
+    "rank": 30,
+    "id": "1402418648332898466",
+    "name": "Red Dead Redemption 2",
+    "icon_hash": "75c2c44bff1ae551b476eccc67e8258c"
+  },
+  {
+    "rank": 31,
+    "id": "359509007423242240",
+    "name": "The Sims 4",
+    "icon_hash": "912bd1dd19dfd2ef3b0191985f942a40"
+  },
+  {
+    "rank": 32,
+    "id": "356875762940379136",
+    "name": "World of Warcraft",
+    "icon_hash": "fc92f820c44e72085dc6205e5e746850"
+  },
+  {
+    "rank": 33,
+    "id": "356889262362329098",
+    "name": "FINAL FANTASY XIV ONLINE",
+    "icon_hash": "8fbbc6725f295195c8dd4f390ccd8611"
+  },
+  {
+    "rank": 34,
+    "id": "356888453796986880",
+    "name": "Path of Exile",
+    "icon_hash": "1f162572c3123655e42c615b18074ff3"
+  },
+  {
+    "rank": 35,
+    "id": "940810636273795162",
+    "name": "Lost Ark",
+    "icon_hash": "2df369a2ad4ceeb1fe50c89adc21f442"
+  },
+  {
+    "rank": 36,
+    "id": "787443973538971748",
+    "name": "Cyberpunk 2077",
+    "icon_hash": "023b9ec72cd60e31e25bca878c77984a"
+  },
+  {
+    "rank": 37,
+    "id": "477152881196269569",
+    "name": "Monster Hunter: World",
+    "icon_hash": "8fd08a2e0440f80334ea403d2300a828"
+  },
+  {
+    "rank": 38,
+    "id": "363413834301571072",
+    "name": "Sid Meier's Civilization VI",
+    "icon_hash": "898cdf97668109199473d5cdc160fa98"
+  },
+  {
+    "rank": 39,
+    "id": "742897755160313986",
+    "name": "Fall Guys",
+    "icon_hash": "4abfab12a5b69e66d558d51b855f7fc8"
+  },
+  {
+    "rank": 40,
+    "id": "512501896896970762",
+    "name": "Fallout 76",
+    "icon_hash": "54b278e3d422981eefed2cf4194704b7"
+  },
+  {
+    "rank": 41,
+    "id": "1402418082366095493",
+    "name": "Sea of Thieves",
+    "icon_hash": "1a71e40399e3d8b311b9455dd8ca28d9"
+  },
+  {
+    "rank": 42,
+    "id": "1166979555806949406",
+    "name": "ARK: Survival Ascended",
+    "icon_hash": "5f57dfe40009839b332c3b6a445ad7b9"
+  },
+  {
+    "rank": 43,
+    "id": "1402418103702524046",
+    "name": "Phasmophobia",
+    "icon_hash": "f65b973be17cd0d2413f34a836279fae"
+  },
+  {
+    "rank": 44,
+    "id": "428054228511227914",
+    "name": "Deep Rock Galactic",
+    "icon_hash": "f2eb28103bedcfe67bb4d2da6ff663b9"
+  },
+  {
+    "rank": 45,
+    "id": "1402418075726254102",
+    "name": "Euro Truck Simulator 2",
+    "icon_hash": "46bfdfc58e4eacbfde29b2461e118e78"
+  },
+  {
+    "rank": 46,
+    "id": "457300140470960128",
+    "name": "Trackmania",
+    "icon_hash": "236d2a67350cea2ad01fe1725449c850"
+  },
+  {
+    "rank": 47,
+    "id": "1402418239342120960",
+    "name": "osu!",
+    "icon_hash": "ea86f6c52576847a7cb81f1c1faa18a3"
+  },
+  {
+    "rank": 48,
+    "id": "356888577310851072",
+    "name": "Team Fortress 2",
+    "icon_hash": "f903d1168b9f975761f53b91e1a20b26"
+  },
+  {
+    "rank": 49,
+    "id": "356879032584896512",
+    "name": "Garry's Mod",
+    "icon_hash": "ade1008d735a1a134693b15ce02d79a8"
+  },
+  {
+    "rank": 50,
+    "id": "1402417752404394125",
+    "name": "PAYDAY 2",
+    "icon_hash": "ee8b5591bed0d4a2664ca334c0d4d2b9"
+  },
+  {
+    "rank": 51,
+    "id": "357607478105604096",
+    "name": "War Thunder",
+    "icon_hash": "b23dfa191e3f3aa8142572110a99723f"
+  },
+  {
+    "rank": 52,
+    "id": "1402418374851432561",
+    "name": "Black Desert",
+    "icon_hash": "112e60c67a42d9d8f6c9e1f3c60e843b"
+  },
+  {
+    "rank": 53,
+    "id": "358422012990849024",
+    "name": "SMITE",
+    "icon_hash": "d47e191eb893a1d6377264e11f1e901b"
+  },
+  {
+    "rank": 54,
+    "id": "1113966530531704943",
+    "name": "Diablo IV",
+    "icon_hash": "ced913ddd2b497545cd3e2931b1310ab"
+  },
+  {
+    "rank": 55,
+    "id": "356875890958925834",
+    "name": "Hearthstone",
+    "icon_hash": "584d496943e719a759906563442d2a87"
+  },
+  {
+    "rank": 56,
+    "id": "356878860190613504",
+    "name": "Heroes of the Storm",
+    "icon_hash": "7b3bc9037909ab14917accca8c6fb8c1"
+  },
+  {
+    "rank": 57,
+    "id": "1421154726023532544",
+    "name": "EA Sports FC 26",
+    "icon_hash": "e85d24b1df91c48a7cd4d2842f05436b"
+  },
+  {
+    "rank": 58,
+    "id": "1411078068629536828",
+    "name": "NBA 2K26",
+    "icon_hash": "fd654b788344e34072e37858c364ee28"
+  }
+]

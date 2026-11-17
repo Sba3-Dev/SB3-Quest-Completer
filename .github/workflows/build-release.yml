@@ -1,0 +1,84 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply release version
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $version = $env:RELEASE_TAG.TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Release tag must use semantic version format such as v0.0.5 or v0.1.0"
+          }
+          $mina = Get-Content mina.py -Raw
+          $mina = $mina -replace 'VERSION = "[^"]+"', ('VERSION = "' + $version + '"')
+          Set-Content mina.py $mina -Encoding UTF8
+          $iss = Get-Content installer.iss -Raw
+          $iss = $iss -replace '#define MyAppVersion "[^"]+"', ('#define MyAppVersion "' + $version + '"')
+          Set-Content installer.iss $iss -Encoding UTF8
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pyinstaller requests pillow pypresence
+
+      - name: Build application EXE
+        shell: cmd
+        run: >-
+          python -m PyInstaller --noconfirm --clean --onefile --windowed
+          --name SB3QuestCompleter --icon logo.ico
+          --add-data "logo.ico;." --add-data "assets;assets"
+          --distpath dist --workpath build --specpath build mina.py
+
+      - name: Build Setup.exe
+        uses: Minionguyjpro/Inno-Setup-Compiler@main
+        with:
+          filepath: installer.iss
+
+      - name: Upload installer to GitHub Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" `
+            "installer-output/SB3QuestCompleter-Setup.exe" --clobber
+
+      - name: Publish update manifest
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $version = $env:RELEASE_TAG.TrimStart('v')
+          $hash = (Get-FileHash "installer-output/SB3QuestCompleter-Setup.exe" -Algorithm SHA256).Hash.ToLower()
+          $manifest = @{
+            version = $version
+            installer_url = "https://github.com/$($env:REPOSITORY)/releases/download/$($env:RELEASE_TAG)/SB3QuestCompleter-Setup.exe"
+            sha256 = $hash
+          } | ConvertTo-Json
+          Set-Content update.json $manifest -Encoding UTF8
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add update.json
+          git commit -m "chore: publish update manifest $version"
+          git push origin HEAD:main
