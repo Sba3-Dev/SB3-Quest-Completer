@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -110,7 +110,8 @@ UI_TEXT = {
         "update_subtitle": "Application update", "update_title": "A new update is available",
         "current_version": "Current version: {version}", "new_version": "New version: {version}",
         "update_button": "Update now", "downloading_update": "Downloading update...",
-        "update_error": "There was an error updating. Please try again.",
+        "update_error": "There was an error updating. Please try again.", "download_speed": "Speed: {speed}/s",
+        "time_remaining": "Time remaining: {time}", "launching_update": "Launching the installer...",
     },
     "ar": {
         "settings": "الإعدادات", "settings_title": "الإعدادات", "settings_note": "تُحفظ التغييرات محليًا وتُطبّق فورًا.",
@@ -142,7 +143,8 @@ UI_TEXT = {
         "update_subtitle": "تحديث التطبيق", "update_title": "يتوفر تحديث جديد",
         "current_version": "النسخة الحالية: {version}", "new_version": "النسخة الجديدة: {version}",
         "update_button": "تحديث الآن", "downloading_update": "جارٍ تنزيل التحديث...",
-        "update_error": "حدث خطأ في التحديث، يرجى المحاولة مرة أخرى.",
+        "update_error": "حدث خطأ في التحديث، يرجى المحاولة مرة أخرى.", "download_speed": "السرعة: {speed}/ث",
+        "time_remaining": "الوقت المتبقي: {time}", "launching_update": "جارٍ تشغيل المثبت...",
     },
 }
 
@@ -1004,11 +1006,53 @@ class QuestCompleterApp:
         self.update_status = tk.Label(content, text="", bg=PANEL, fg=TEXT_DIM,
                                       font=("Segoe UI", 9), wraplength=350, justify="center")
         self.update_status.pack(pady=(0, 12))
+        progress_row = tk.Frame(content, bg=PANEL)
+        progress_row.pack(fill="x", padx=34, pady=(0, 4))
+        self.update_percent_label = tk.Label(progress_row, text="0%", bg=PANEL, fg=TEXT_DIM,
+                                             font=("Segoe UI", 9, "bold"))
+        self.update_percent_label.pack(side="left")
+        self.update_total_label = tk.Label(progress_row, text="%100", bg=PANEL, fg=MUTED,
+                                           font=("Segoe UI", 9, "bold"))
+        self.update_total_label.pack(side="right")
+        self.update_progress_canvas = tk.Canvas(content, bg=INPUT, highlightthickness=0, bd=0,
+                                                width=360, height=12)
+        self.update_progress_canvas.pack(fill="x", padx=34, pady=(0, 9))
+        self.update_progress_fill = self.update_progress_canvas.create_rectangle(0, 0, 0, 12, fill=RED, outline="")
+        self.update_stats_label = tk.Label(content, text="", bg=PANEL, fg=MUTED,
+                                           font=("Segoe UI", 8), wraplength=350, justify="center")
+        self.update_stats_label.pack(pady=(0, 7))
         self.update_button = PillButton(content, text=self.tr("update_button"), command=self.install_latest_update,
                                         fill=RED, hover_fill=RED_HOVER, width=190, height=42, background=PANEL)
         self.update_button.pack(pady=6)
         self._auth_footer()
         self._enable_feedback_tree(self.root)
+
+    @staticmethod
+    def _format_download_size(value: float) -> str:
+        amount = float(max(0.0, value))
+        for unit in ("B", "KB", "MB", "GB"):
+            if amount < 1024 or unit == "GB":
+                return f"{amount:.1f} {unit}" if unit != "B" else f"{int(amount)} {unit}"
+            amount /= 1024
+        return f"{amount:.1f} GB"
+
+    @staticmethod
+    def _format_download_time(seconds: float | None) -> str:
+        if seconds is None or seconds < 0 or seconds > 86400:
+            return "--:--"
+        total = int(seconds)
+        return f"{total // 60:02d}:{total % 60:02d}"
+
+    def _render_download_progress(self, received: int, total: int, speed: float, eta: float | None) -> None:
+        try:
+            ratio = min(1.0, max(0.0, received / total)) if total else 0.0
+            self.update_progress_canvas.coords(self.update_progress_fill, 0, 0, 360 * ratio, 12)
+            self.update_percent_label.configure(text=f"{int(ratio * 100)}%")
+            speed_text = self._format_download_size(speed)
+            eta_text = self._format_download_time(eta)
+            self.update_stats_label.configure(text=f"{self.tr('download_speed', speed=speed_text)}  ·  {self.tr('time_remaining', time=eta_text)}")
+        except tk.TclError:
+            pass
 
     def install_latest_update(self) -> None:
         if self.auth_busy or not self.latest_manifest:
@@ -1025,12 +1069,20 @@ class QuestCompleterApp:
             latest = str(manifest["version"])
             download = requests.get(installer_url, headers=HEADERS, timeout=(10, 120), stream=True)
             download.raise_for_status()
+            total = int(download.headers.get("content-length") or 0)
+            received = 0
+            started = time.monotonic()
             suffix = Path(installer_url.split("?", 1)[0]).suffix or ".exe"
             temp_path = Path(tempfile.gettempdir()) / f"SB3QuestCompleter-update-{latest}{suffix}"
             with temp_path.open("wb") as target:
                 for chunk in download.iter_content(chunk_size=1024 * 1024):
                     if chunk:
                         target.write(chunk)
+                        received += len(chunk)
+                        elapsed = max(0.001, time.monotonic() - started)
+                        speed = received / elapsed
+                        eta = (total - received) / speed if total and speed > 0 else None
+                        self.root.after(0, self._render_download_progress, received, total, speed, eta)
             expected_hash = str(manifest.get("sha256", "")).strip().casefold()
             if expected_hash:
                 digest = hashlib.sha256(temp_path.read_bytes()).hexdigest().casefold()
@@ -1038,6 +1090,8 @@ class QuestCompleterApp:
                     raise ValueError("update checksum mismatch")
             if os.name != "nt":
                 raise RuntimeError("Windows installer can only run on Windows")
+            self.root.after(0, self._render_download_progress, max(received, total), total, max(0.0, received / max(0.001, time.monotonic() - started)), 0.0)
+            self.root.after(0, lambda: self.update_status.configure(text=self.tr("launching_update")))
             os.startfile(str(temp_path))
             self.root.after(0, self.root.destroy)
         except Exception:
