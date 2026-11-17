@@ -41,7 +41,7 @@ except ImportError:
     Presence = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.1.4"
+VERSION = "0.1.5"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1111,7 +1111,10 @@ class QuestCompleterApp:
                 raise RuntimeError("Windows installer can only run on Windows")
             self.root.after(0, self._render_download_progress, max(received, total), total, max(0.0, received / max(0.001, time.monotonic() - started)), 0.0)
             self.root.after(0, lambda: self.update_status.configure(text=self.tr("launching_update")))
-            os.startfile(str(temp_path))
+            subprocess.Popen([
+                str(temp_path), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+                "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS", "/TASKS=",
+            ])
             self.root.after(0, self.root.destroy)
         except Exception:
             self.root.after(0, lambda: self._update_failed())
