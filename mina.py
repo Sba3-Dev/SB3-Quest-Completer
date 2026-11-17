@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.4.1"
+VERSION = "0.4.2"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -538,14 +538,37 @@ def discord_login() -> tuple[bool, str]:
             returned_state = str((params.get("state") or [""])[0])
             error = str((params.get("error") or [""])[0])
             result_queue.put((code if returned_state == state else "", error or "state_error" if returned_state != state else ""))
-            body = b"<!doctype html><html><body style='background:#0e080a'></body></html>"
+            language = "en"
+            try:
+                settings_path = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "settings.json"
+                settings = json.loads(settings_path.read_text(encoding="utf-8"))
+                language = str(settings.get("language", "en")) if isinstance(settings, dict) else "en"
+            except (OSError, ValueError, TypeError):
+                pass
+            arabic = language == "ar"
+            direction = "rtl" if arabic else "ltr"
+            title = "تم تسجيل الدخول بنجاح" if arabic else "Signed in successfully"
+            message = "يمكنك إغلاق هذه الصفحة والعودة إلى الأداة." if arabic else "You can close this page and return to the app."
+            close_text = "إغلاق والعودة إلى الأداة" if arabic else "Close and return to the app"
+            try:
+                icon = base64.b64encode(resource_path("logo.ico").read_bytes()).decode("ascii")
+            except OSError:
+                icon = ""
+            icon_html = f'<img src="data:image/x-icon;base64,{icon}" class="logo" alt="SB3">' if icon else '<div class="logo-fallback">SB3</div>'
+            body = f'''<!doctype html><html lang="{'ar' if arabic else 'en'}" dir="{direction}"><head><meta charset="utf-8"><title>SB3</title>
+            <style>body{{margin:0;background:#0e080a;color:#f7eff0;font-family:Segoe UI,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}}
+            .card{{width:350px;padding:34px 28px;border:1px solid #3b2026;border-radius:24px;background:#1b0c10;text-align:center;box-shadow:0 18px 60px #0008}}
+            .logo{{width:78px;height:78px;object-fit:contain;margin-bottom:16px}}.logo-fallback{{font-size:30px;font-weight:700;color:#a7474d;margin-bottom:16px}}
+            h1{{font-size:20px;margin:0 0 12px}}p{{color:#ccb8bc;font-size:14px;line-height:1.6;margin:0 0 24px}}button{{border:0;border-radius:12px;padding:13px 20px;background:#a7474d;color:#fff;font-size:14px;cursor:pointer}}button:hover{{background:#b9585e}}</style></head>
+            <body><main class="card">{icon_html}<h1>{title}</h1><p>{message}</p><button onclick="closePage()">{close_text}</button></main>
+            <script>function closePage(){{try{{window.open('', '_self', '');}}catch(e){{}}try{{window.close();}}catch(e){{}}}}</script></body></html>'''.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
             if webview:
-                threading.Timer(0.15, close_embedded_window).start()
+                threading.Timer(1.8, close_embedded_window).start()
 
         def log_message(self, _format: str, *_args: Any) -> None:
             return
