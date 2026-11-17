@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.4.9"
+VERSION = "0.5.0"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -992,7 +992,9 @@ class QuestCompleterApp:
         self.root.after(0, self.start_auth_gate)
 
     def _auth_check_worker(self) -> None:
-        valid, reason = check_saved_discord_session()
+        # Refresh the OAuth session once on every fresh process start so that
+        # membership changes are not hidden by the previous access token.
+        valid, reason = check_saved_discord_session(force_refresh=True)
         self.root.after(0, lambda: self._finish_auth_check(valid, reason))
 
     def _finish_auth_check(self, valid: bool, reason: str) -> None:
