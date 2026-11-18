@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.6.5"
+VERSION = "0.6.9"
 _SINGLE_INSTANCE_HANDLE = None
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
@@ -1343,7 +1343,36 @@ class QuestCompleterApp:
         # حواف أكثر هدوءًا وبساطة للوحتي المكتبة وقائمة المهام.
         return RoundedSurface(parent, fill=PANEL, radius=20, width=width, height=height, background=BG)
 
+    def _draw_grid_backdrop(self, _event=None) -> None:
+        """Paint a restrained gaming-style grid behind the main dashboard."""
+        canvas = getattr(self, "grid_backdrop", None)
+        if not canvas:
+            return
+        try:
+            width = max(1, canvas.winfo_width())
+            height = max(1, canvas.winfo_height())
+            canvas.delete("grid")
+            step = 34
+            for x in range(0, width + step, step):
+                color = "#211318" if (x // step) % 4 else "#28171D"
+                canvas.create_line(x, 0, x, height, fill=color, width=1, tags="grid")
+            for y in range(0, height + step, step):
+                color = "#211318" if (y // step) % 4 else "#28171D"
+                canvas.create_line(0, y, width, y, fill=color, width=1, tags="grid")
+            # A quiet burgundy focal glow in the upper-right corner.
+            canvas.create_oval(width - 360, -260, width + 90, 190,
+                               outline="#28141A", width=2, tags="grid")
+            canvas.create_oval(width - 330, -230, width + 60, 160,
+                               outline="#211117", width=1, tags="grid")
+        except tk.TclError:
+            pass
+
     def build_ui(self) -> None:
+        self.grid_backdrop = tk.Canvas(self.root, bg=BG, highlightthickness=0, bd=0)
+        self.grid_backdrop.place(x=0, y=0, relwidth=1, relheight=1)
+        self.grid_backdrop.lower()
+        self.grid_backdrop.bind("<Configure>", self._draw_grid_backdrop)
+        self._draw_grid_backdrop()
         header = tk.Frame(self.root, bg=BG)
         header.pack(fill="x", padx=30, pady=(22, 15))
         self.build_account_widget(header)
@@ -2033,23 +2062,32 @@ class QuestCompleterApp:
         self.render_next_page()
 
     def create_game_card(self, game: dict[str, Any]) -> None:
-        surface = RoundedSurface(self.cards, fill=CARD, radius=14, width=560, height=88, background=PANEL)
+        surface = RoundedSurface(self.cards, fill=CARD, radius=16, width=560, height=96, background=PANEL)
         surface.pack(fill="x", padx=3, pady=5)
         card = surface.content
         card.surface = surface
-        icon_slot = tk.Frame(card, width=54, height=54, bg=CARD)
-        icon_slot.pack(side="left", padx=(14, 8), pady=8)
+        accent = tk.Frame(card, bg=RED, width=3)
+        accent.pack(side="left", fill="y", padx=(0, 10), pady=13)
+        icon_slot = tk.Frame(card, width=56, height=56, bg=INPUT,
+                             highlightthickness=1, highlightbackground=BORDER)
+        icon_slot.pack(side="left", padx=(3, 10), pady=9)
         icon_slot.pack_propagate(False)
         initials = game["_public_name"][:1].upper() or "?"
-        icon = tk.Label(icon_slot, text=initials, bg=CARD, fg=RED, font=("Segoe UI", 18, "bold"))
+        icon = tk.Label(icon_slot, text=initials, bg=INPUT, fg=RED_HOVER,
+                        font=("Segoe UI", 18, "bold"))
         icon.pack(expand=True)
         info = tk.Frame(card, bg=CARD)
-        info.pack(side="left", fill="x", expand=True, pady=8)
-        tk.Label(info, text=game["_public_name"], bg=CARD, fg=TEXT, font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x")
+        info.pack(side="left", fill="x", expand=True, pady=10)
+        tk.Label(info, text=game["_public_name"], bg=CARD, fg=TEXT,
+                 font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x")
+        platforms = game.get("_platforms") or ()
+        metadata = f"APP ID  {game.get('id', '')}   •   {len(platforms)} VERIFIED PLATFORM(S)"
+        tk.Label(info, text=metadata, bg=CARD, fg=MUTED,
+                 font=("Segoe UI", 7, "bold"), anchor="w").pack(fill="x", pady=(5, 0))
         add = PillButton(card, text=self.tr("add"), command=lambda g=game: self.add_to_queue(g), fill=RED,
-                         hover_fill=RED_HOVER, width=76, height=32, background=CARD)
-        add.pack(side="right", padx=14, pady=16)
-        for widget in (surface, card, icon_slot, icon, info):
+                         hover_fill=RED_HOVER, width=76, height=34, background=CARD)
+        add.pack(side="right", padx=14, pady=17)
+        for widget in (surface, card, accent, icon_slot, icon, info):
             widget.bind("<Enter>", lambda _e, c=card: self.hover_card(c, CARD_HOVER))
             widget.bind("<Leave>", lambda _e, c=card: self.hover_card(c, CARD))
         self.request_icon(game, icon)
