@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.5.1"
+VERSION = "0.5.2"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1027,48 +1027,18 @@ class QuestCompleterApp:
         webbrowser.open_new_tab(SUPPORT_DISCORD_URL)
 
     def refresh_membership(self) -> None:
-        """Restart the app so Discord membership is checked from a clean session."""
+        """Refresh membership in place without closing or restarting the app."""
         if self.auth_busy:
             return
         self.membership_watch_active = False
         self.auth_busy = True
-        try:
-            if getattr(sys, "frozen", False):
-                command = [sys.executable, *sys.argv[1:]]
-                cwd = str(Path(sys.executable).resolve().parent)
-            else:
-                command = [sys.executable, str(Path(sys.argv[0]).resolve()), *sys.argv[1:]]
-                cwd = str(Path(sys.argv[0]).resolve().parent)
-            child_env = os.environ.copy()
-            # PyInstaller one-file bootloaders must not inherit the old _MEIPASS
-            # extraction directory after the current process exits.
-            child_env.pop("_MEIPASS2", None)
-            child_env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
-            if os.name == "nt":
-                app_path = Path(sys.executable if getattr(sys, "frozen", False) else command[1]).resolve()
-                install_dir = app_path.parent
-                updater_path = install_dir / "SB3Updater.exe"
-                if not updater_path.exists():
-                    updater_path = resource_path("SB3Updater.exe")
-                if not updater_path.exists():
-                    raise FileNotFoundError("SB3Updater.exe is missing")
-                flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-                subprocess.Popen([str(updater_path), "--restart", str(os.getpid()), str(app_path)],
-                                 cwd=str(updater_path.parent), env=child_env,
-                                 close_fds=False, creationflags=flags)
-            else:
-                subprocess.Popen(command, cwd=cwd, env=child_env, close_fds=False)
-        except OSError:
-            self.auth_busy = False
-            self.build_membership_screen(error=True)
-            return
-        self.root.after(50, self._exit_for_restart)
+        self.build_membership_screen()
+        threading.Thread(target=self._refresh_membership_worker, daemon=True,
+                         name="sb3-membership-refresh").start()
 
-    def _exit_for_restart(self) -> None:
-        try:
-            self.root.destroy()
-        finally:
-            os._exit(0)
+    def _refresh_membership_worker(self) -> None:
+        valid, _reason = check_saved_discord_session(force_refresh=True)
+        self.root.after(0, lambda: self._finish_membership_check(valid))
 
     def _membership_worker(self) -> None:
         valid = False
