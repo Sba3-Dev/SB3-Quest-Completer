@@ -40,6 +40,11 @@ def replace_file(source: Path, destination: Path) -> None:
 
 def copy_tree(source: Path, target: Path) -> None:
     for item in source.iterdir():
+        # The updater is running from the installation directory. Windows
+        # cannot replace a running executable; the current updater remains
+        # compatible and can safely launch the newly updated application.
+        if os.name == "nt" and item.name.casefold() == "sb3updater.exe":
+            continue
         destination = target / item.name
         if item.is_dir():
             if destination.exists():
@@ -56,7 +61,13 @@ def restart_app(pid: int, app_path: Path) -> int:
     env = os.environ.copy()
     env.pop("_MEIPASS2", None)
     env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
-    subprocess.Popen([str(app_path)], cwd=str(app_path.parent), env=env, close_fds=True)
+    if not app_path.is_file():
+        return 5
+    flags = 0
+    if os.name == "nt":
+        flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    subprocess.Popen([str(app_path)], cwd=str(app_path.parent), env=env, close_fds=True,
+                     creationflags=flags)
     return 0
 
 
@@ -98,7 +109,16 @@ def main() -> int:
             package.unlink(missing_ok=True)
         except OSError:
             pass
-        subprocess.Popen([str(app_path)], cwd=str(install_dir), close_fds=True)
+        if not app_path.is_file():
+            return 5
+        env = os.environ.copy()
+        env.pop("_MEIPASS2", None)
+        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+        flags = 0
+        if os.name == "nt":
+            flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        subprocess.Popen([str(app_path)], cwd=str(install_dir), env=env, close_fds=True,
+                         creationflags=flags)
         return 0
     finally:
         shutil.rmtree(stage, ignore_errors=True)
