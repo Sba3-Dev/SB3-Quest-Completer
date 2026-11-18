@@ -56,6 +56,7 @@ class WebRuntime:
         self.health_busy = False
         self.update_cancel_event = threading.Event()
         self.update_busy = False
+        self.window_maximized = False
 
     def bootstrap(self) -> dict[str, Any]:
         session = self.mina.load_discord_session()
@@ -238,6 +239,30 @@ class WebRuntime:
             progress = f";document.getElementById('update-progress-fill').style.width='{max(0,min(100,ratio*100)):.1f}%'"
         self._evaluate(f"document.getElementById('update-status').textContent={payload}{progress}")
 
+    def _update_meta(self, received: int, total: int, started_at: float) -> None:
+        size = self._format_bytes(total) if total else "Unknown size"
+        elapsed = max(0.01, time.monotonic() - started_at)
+        speed = received / elapsed
+        remaining = "Calculating…" if not speed or not total else self._format_duration((total - received) / speed)
+        self._evaluate("document.getElementById('update-remaining').textContent=%s;document.getElementById('update-size').textContent=%s" %
+                        (self._json(f"Time remaining: {remaining}"), self._json(f"Update size: {size}")))
+
+    @staticmethod
+    def _format_bytes(value: int) -> str:
+        amount = float(max(0, value))
+        for unit in ("B", "KB", "MB", "GB"):
+            if amount < 1024 or unit == "GB":
+                return f"{amount:.1f} {unit}" if unit != "B" else f"{int(amount)} B"
+            amount /= 1024
+        return "Unknown size"
+
+    @staticmethod
+    def _format_duration(seconds: float) -> str:
+        total = max(0, int(seconds))
+        minutes, secs = divmod(total, 60)
+        hours, minutes = divmod(minutes, 60)
+        return f"{hours}h {minutes:02d}m {secs:02d}s" if hours else f"{minutes}m {secs:02d}s"
+
     def _download_update_worker(self, manifest: dict[str, Any]) -> None:
         temp_path: Path | None = None
         try:
@@ -253,6 +278,9 @@ class WebRuntime:
             download.raise_for_status()
             total = int(download.headers.get("content-length") or manifest.get("package_size") or 0)
             received = 0
+            started_at = time.monotonic()
+            last_meta = 0.0
+            self._update_meta(0, total, started_at)
             temp_path = Path(tempfile.gettempdir()) / f"SB3QuestCompleter-update-{latest}.zip"
             with temp_path.open("wb") as target:
                 for chunk in download.iter_content(chunk_size=1024 * 1024):
@@ -267,6 +295,9 @@ class WebRuntime:
                     received += len(chunk)
                     self._update_ui(f"Downloading update… {int(received / total * 100) if total else 0}%",
                                     received / total if total else None)
+                    if time.monotonic() - last_meta >= 0.25 or (total and received >= total):
+                        self._update_meta(received, total, started_at)
+                        last_meta = time.monotonic()
             expected_hash = str(manifest.get("package_sha256") or manifest.get("sha256") or "").strip().casefold()
             if expected_hash:
                 digest = hashlib.sha256(temp_path.read_bytes()).hexdigest().casefold()
@@ -460,6 +491,31 @@ class WebRuntime:
         self.closed = True
         self.stop_all()
 
+    def minimize_window(self) -> None:
+        self.window.minimize()
+
+    def toggle_maximize(self) -> None:
+        try:
+            if self.window_maximized:
+                self.window.restore()
+            else:
+                self.window.maximize()
+            self.window_maximized = not self.window_maximized
+        except Exception:
+            pass
+
+    def close_window(self) -> None:
+        try:
+            self.window.destroy()
+        except Exception:
+            self.close()
+
+    def move_window(self, dx: int, dy: int) -> None:
+        try:
+            self.window.move(int(self.window.x) + int(dx), int(self.window.y) + int(dy))
+        except Exception:
+            pass
+
     def _public_games(self) -> list[dict[str, Any]]:
         with self.lock:
             result = []
@@ -516,6 +572,10 @@ def launch_web_ui() -> bool:
         on_logout=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].logout(),
         on_update=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].install_update(),
         on_cancel_update=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].cancel_update(),
+        on_minimize=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].minimize_window(),
+        on_maximize=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].toggle_maximize(),
+        on_close_window=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].close_window(),
+        on_move_window=lambda dx, dy: runtime_holder.get("runtime") and runtime_holder["runtime"].move_window(dx, dy),
         on_add=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].add_to_queue(game_id),
         on_remove=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].remove_from_queue(game_id),
         on_run=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].run_quest(game_id),
@@ -531,6 +591,7 @@ def launch_web_ui() -> bool:
     def create() -> None:
         window = webview.create_window("SB3 Quest Completer", str(mina.resource_path("webui/index.html")),
                                        width=1180, height=820, min_size=(980, 640),
+                                       frameless=True, easy_drag=False,
                                        js_api=bridge)
         runtime = WebRuntime(window)
         runtime_holder["runtime"] = runtime

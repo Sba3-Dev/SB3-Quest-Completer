@@ -21,6 +21,10 @@ class WebUiBridge:
                  on_logout: Callable[[], None] | None = None,
                  on_update: Callable[[], None] | None = None,
                  on_cancel_update: Callable[[], None] | None = None,
+                 on_minimize: Callable[[], None] | None = None,
+                 on_maximize: Callable[[], None] | None = None,
+                 on_close_window: Callable[[], None] | None = None,
+                 on_move_window: Callable[[int, int], None] | None = None,
                  on_add: Callable[[str], None] | None = None,
                  on_remove: Callable[[str], None] | None = None,
                  on_run: Callable[[str], None] | None = None,
@@ -32,6 +36,8 @@ class WebUiBridge:
         self._on_login, self._on_support = on_login, on_support
         self._on_membership, self._on_logout, self._on_update = on_membership, on_logout, on_update
         self._on_cancel_update = on_cancel_update
+        self._on_minimize, self._on_maximize = on_minimize, on_maximize
+        self._on_close_window, self._on_move_window = on_close_window, on_move_window
         self._on_add, self._on_remove = on_add, on_remove
         self._on_run, self._on_stop, self._on_stop_all = on_run, on_stop, on_stop_all
 
@@ -72,6 +78,25 @@ class WebUiBridge:
     def cancel_update(self) -> None:
         if self._on_cancel_update:
             self._on_cancel_update()
+
+    def minimize_window(self) -> None:
+        if self._on_minimize:
+            self._on_minimize()
+
+    def toggle_maximize(self) -> None:
+        if self._on_maximize:
+            self._on_maximize()
+
+    def close_window(self) -> None:
+        if self._on_close_window:
+            self._on_close_window()
+
+    def move_window(self, dx: int, dy: int) -> None:
+        if self._on_move_window:
+            try:
+                self._on_move_window(int(dx), int(dy))
+            except (TypeError, ValueError):
+                pass
 
     def add_to_queue(self, game_id: str) -> None:
         if self._on_add and isinstance(game_id, str) and game_id.strip():
