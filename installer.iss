@@ -35,3 +35,4 @@ Name: "desktopicon"; Description: "Add a desktop shortcut"; GroupDescription: "A
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall
+
