@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.6.4"
+VERSION = "0.6.5"
 _SINGLE_INSTANCE_HANDLE = None
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
@@ -64,8 +64,8 @@ BORDER = "#3B2026"          # فواصل وحدود خافتة
 TEXT = "#F7EFF0"            # نص رئيسي ناعم وعالي الوضوح
 TEXT_DIM = "#CCB8BC"        # نص ثانوي
 MUTED = "#967B81"           # نص مساعد وخافت
-RED = "#B73549"             # لون قرمزي فخم للإجراء الرئيسي
-RED_HOVER = "#CC4659"       # تفاعل هادئ عند المرور
+RED = "#A7474D"             # لون الإجراء الرئيسي
+RED_HOVER = "#B9585E"       # تفاعل هادئ عند المرور
 RED_DARK = "#3D161C"        # زر الإيقاف — أحمر داكن واضح
 RED_DARK_HOVER = "#552128"  # تفاعل زر الإيقاف
 SUCCESS = "#83A38B"         # حالة النجاح
@@ -74,7 +74,7 @@ SUCCESS = "#83A38B"         # حالة النجاح
 BURGUNDY_PALETTE = {
     "BG": "#0E080A", "PANEL": "#1B0C10", "CARD": "#251217", "CARD_HOVER": "#321A20",
     "INPUT": "#160A0D", "BORDER": "#3B2026", "TEXT": "#F7EFF0", "TEXT_DIM": "#CCB8BC",
-    "MUTED": "#967B81", "RED": "#B73549", "RED_HOVER": "#CC4659",
+    "MUTED": "#967B81", "RED": "#A7474D", "RED_HOVER": "#B9585E",
     "RED_DARK": "#3D161C", "RED_DARK_HOVER": "#552128", "SUCCESS": "#83A38B",
 }
 HIGH_CONTRAST_PALETTE = {
@@ -91,7 +91,6 @@ UI_TEXT = {
         "small": "Small", "default": "Default", "large": "Large", "xl": "XL",
         "calm": "Calm", "high_contrast": "High contrast", "support": "Support",
         "featured_games": "Featured Discord games", "preparing_library": "Preparing your library",
-        "dashboard_banner_title": "What will you play?", "dashboard_banner_text": "Discover games from Discord and add them to your queue.",
         "search_hint": "Search by game name or Discord task/application ID", "load_more": "Load more",
         "quest_queue": "Quest queue", "stop_all": "Stop all", "selected": "selected",
         "queue_help": "Add a game from the library. Only verified PC launchers for that game are shown.",
@@ -128,7 +127,6 @@ UI_TEXT = {
         "small": "صغير", "default": "افتراضي", "large": "كبير", "xl": "كبير جدًا",
         "calm": "هادئ", "high_contrast": "تباين عالٍ", "support": "الدعم",
         "featured_games": "ألعاب Discord المميزة", "preparing_library": "يتم تجهيز المكتبة",
-        "dashboard_banner_title": "ماذا تريد أن تلعب؟", "dashboard_banner_text": "اكتشف الألعاب من Discord وأضفها إلى قائمة التشغيل.",
         "search_hint": "ابحث باسم اللعبة أو معرّف مهمة/تطبيق Discord", "load_more": "عرض المزيد",
         "quest_queue": "قائمة المهام", "stop_all": "إيقاف الكل", "selected": "محددة",
         "queue_help": "أضف لعبة من المكتبة. تظهر فقط منصات الكمبيوتر المعتمدة لهذه اللعبة.",
@@ -869,7 +867,6 @@ class QuestCompleterApp:
             widget.destroy()
 
     def _auth_header(self, subtitle: str) -> None:
-        self._add_grid_background()
         header = tk.Frame(self.root, bg=BG)
         header.pack(fill="x", padx=30, pady=(22, 15))
         logo_slot = tk.Frame(header, width=46, height=46, bg=BG)
@@ -1346,19 +1343,7 @@ class QuestCompleterApp:
         # حواف أكثر هدوءًا وبساطة للوحتي المكتبة وقائمة المهام.
         return RoundedSurface(parent, fill=PANEL, radius=20, width=width, height=height, background=BG)
 
-    def _add_grid_background(self) -> None:
-        """Add a restrained low-contrast grid behind the current page."""
-        canvas = tk.Canvas(self.root, bg=BG, highlightthickness=0, bd=0)
-        canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
-        for position in range(0, 1400, 40):
-            canvas.create_line(position, 0, position, 1000, fill=BORDER, width=1)
-        for position in range(0, 1000, 40):
-            canvas.create_line(0, position, 1400, position, fill=BORDER, width=1)
-        canvas.lower()
-        self.grid_background = canvas
-
     def build_ui(self) -> None:
-        self._add_grid_background()
         header = tk.Frame(self.root, bg=BG)
         header.pack(fill="x", padx=30, pady=(22, 15))
         self.build_account_widget(header)
@@ -1630,13 +1615,6 @@ class QuestCompleterApp:
             pass
 
     def build_library(self) -> None:
-        banner = RoundedSurface(self.library_panel, fill=RED_DARK, radius=18, width=620, height=82, background=PANEL)
-        banner.pack(fill="x", padx=18, pady=(16, 12))
-        banner_content = banner.content
-        tk.Label(banner_content, text=self.tr("dashboard_banner_title"), bg=RED_DARK, fg=TEXT,
-                 font=("Segoe UI", 15, "bold"), anchor="w").pack(anchor="w", padx=20, pady=(14, 1))
-        tk.Label(banner_content, text=self.tr("dashboard_banner_text"), bg=RED_DARK, fg=TEXT_DIM,
-                 font=("Segoe UI", 9), anchor="w").pack(anchor="w", padx=20)
         top = tk.Frame(self.library_panel, bg=PANEL)
         top.pack(fill="x", padx=22, pady=(20, 10))
         self.results = tk.Label(top, text=self.tr("preparing_library"), bg=PANEL, fg=MUTED, font=("Segoe UI", 9))
@@ -2055,28 +2033,22 @@ class QuestCompleterApp:
         self.render_next_page()
 
     def create_game_card(self, game: dict[str, Any]) -> None:
-        card_index = len(self.cards.winfo_children())
-        card_column = card_index % 4
-        card_row = card_index // 4
-        for column in range(4):
-            self.cards.grid_columnconfigure(column, weight=1, uniform="game-card")
-        surface = RoundedSurface(self.cards, fill=CARD, radius=16, width=190, height=178, background=PANEL)
-        surface.grid(row=card_row, column=card_column, sticky="nsew", padx=6, pady=6)
+        surface = RoundedSurface(self.cards, fill=CARD, radius=14, width=560, height=88, background=PANEL)
+        surface.pack(fill="x", padx=3, pady=5)
         card = surface.content
         card.surface = surface
-        icon_slot = tk.Frame(card, width=64, height=64, bg=CARD)
-        icon_slot.pack(pady=(14, 6))
+        icon_slot = tk.Frame(card, width=54, height=54, bg=CARD)
+        icon_slot.pack(side="left", padx=(14, 8), pady=8)
         icon_slot.pack_propagate(False)
         initials = game["_public_name"][:1].upper() or "?"
-        icon = tk.Label(icon_slot, text=initials, bg=CARD, fg=RED, font=("Segoe UI", 22, "bold"))
+        icon = tk.Label(icon_slot, text=initials, bg=CARD, fg=RED, font=("Segoe UI", 18, "bold"))
         icon.pack(expand=True)
         info = tk.Frame(card, bg=CARD)
-        info.pack(fill="x", padx=12)
-        tk.Label(info, text=game["_public_name"], bg=CARD, fg=TEXT, font=("Segoe UI", 10, "bold"),
-                 anchor="center", justify="center", wraplength=155).pack(fill="x")
+        info.pack(side="left", fill="x", expand=True, pady=8)
+        tk.Label(info, text=game["_public_name"], bg=CARD, fg=TEXT, font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x")
         add = PillButton(card, text=self.tr("add"), command=lambda g=game: self.add_to_queue(g), fill=RED,
-                         hover_fill=RED_HOVER, width=112, height=30, background=CARD)
-        add.pack(pady=(8, 8))
+                         hover_fill=RED_HOVER, width=76, height=32, background=CARD)
+        add.pack(side="right", padx=14, pady=16)
         for widget in (surface, card, icon_slot, icon, info):
             widget.bind("<Enter>", lambda _e, c=card: self.hover_card(c, CARD_HOVER))
             widget.bind("<Leave>", lambda _e, c=card: self.hover_card(c, CARD))
