@@ -53,34 +53,35 @@ UPDATE_MANIFEST_URL = os.getenv(
     "SB3_UPDATE_MANIFEST_URL",
     "https://raw.githubusercontent.com/Sba3-Dev/SB3-Quest-Completer/main/update.json",
 )
-# SB3 Premium Dark UI: الهوية الرسمية الجديدة، مع الحفاظ على نفس منطق التطبيق.
-BG = "#100809"              # الخلفية الرئيسية السوداء المائلة للخمري
-PANEL = "#1D1014"           # أسطح الأقسام الرئيسية
-CARD = "#241318"            # البطاقات
-CARD_HOVER = "#351923"      # مرور هادئ مع توهج وردي خفيف
-INPUT = "#160B0E"           # حقول الإدخال
-BORDER = "#4A202B"          # حدود خمريّة منخفضة التباين
-TEXT = "#F7F1F3"            # النص الرئيسي
-TEXT_DIM = "#D8C3C9"        # النص الثانوي
-MUTED = "#9B7D86"           # النص المساعد
-RED = "#FF3155"             # اللون الرئيسي للتفاعل
-RED_HOVER = "#FF5270"       # حالة المرور
-RED_DARK = "#5A1727"        # الإيقاف
-RED_DARK_HOVER = "#792238"  # مرور الإيقاف
-SUCCESS = "#8FBDA0"         # النجاح
+# Burgundy Minimal: هرم لوني هادئ وواضح، من دون تباين قاسٍ أو تأثيرات مشتّتة.
+# الخلفية الداكنة الموحّدة تُبقي التركيز على محتوى المكتبة والقوائم.
+BG = "#0E080A"              # خلفية خارجية هادئة ودافئة
+PANEL = "#1B0C10"           # سطح اللوحات الرئيسية
+CARD = "#251217"            # بطاقات الألعاب والمهام
+CARD_HOVER = "#321A20"      # تمييز لطيف عند المرور
+INPUT = "#160A0D"           # حقل البحث، أغمق بدرجة بسيطة لراحة العين
+BORDER = "#3B2026"          # فواصل وحدود خافتة
+TEXT = "#F7EFF0"            # نص رئيسي ناعم وعالي الوضوح
+TEXT_DIM = "#CCB8BC"        # نص ثانوي
+MUTED = "#967B81"           # نص مساعد وخافت
+RED = "#A7474D"             # لون الإجراء الرئيسي
+RED_HOVER = "#B9585E"       # تفاعل هادئ عند المرور
+RED_DARK = "#3D161C"        # زر الإيقاف — أحمر داكن واضح
+RED_DARK_HOVER = "#552128"  # تفاعل زر الإيقاف
+SUCCESS = "#83A38B"         # حالة النجاح
 
 # إعدادات مظهر محلية: الوضع الافتراضي الهادئ ووضع تباين أوضح للقراءة.
 BURGUNDY_PALETTE = {
-    "BG": "#100809", "PANEL": "#1D1014", "CARD": "#241318", "CARD_HOVER": "#351923",
-    "INPUT": "#160B0E", "BORDER": "#4A202B", "TEXT": "#F7F1F3", "TEXT_DIM": "#D8C3C9",
-    "MUTED": "#9B7D86", "RED": "#FF3155", "RED_HOVER": "#FF5270",
-    "RED_DARK": "#5A1727", "RED_DARK_HOVER": "#792238", "SUCCESS": "#8FBDA0",
+    "BG": "#0E080A", "PANEL": "#1B0C10", "CARD": "#251217", "CARD_HOVER": "#321A20",
+    "INPUT": "#160A0D", "BORDER": "#3B2026", "TEXT": "#F7EFF0", "TEXT_DIM": "#CCB8BC",
+    "MUTED": "#967B81", "RED": "#A7474D", "RED_HOVER": "#B9585E",
+    "RED_DARK": "#3D161C", "RED_DARK_HOVER": "#552128", "SUCCESS": "#83A38B",
 }
 HIGH_CONTRAST_PALETTE = {
-    "BG": "#0B0608", "PANEL": "#211117", "CARD": "#2D1720", "CARD_HOVER": "#512231",
-    "INPUT": "#13090C", "BORDER": "#8E3D53", "TEXT": "#FFFFFF", "TEXT_DIM": "#F0DDE2",
-    "MUTED": "#D1AAB6", "RED": "#FF3155", "RED_HOVER": "#FF6B86",
-    "RED_DARK": "#6B172C", "RED_DARK_HOVER": "#98223F", "SUCCESS": "#A9D9B8",
+    "BG": "#090607", "PANEL": "#191014", "CARD": "#2A171D", "CARD_HOVER": "#43242C",
+    "INPUT": "#120A0D", "BORDER": "#74414D", "TEXT": "#FFFFFF", "TEXT_DIM": "#E7D4D9",
+    "MUTED": "#C5A8AF", "RED": "#CF5D67", "RED_HOVER": "#E16F78",
+    "RED_DARK": "#571C26", "RED_DARK_HOVER": "#742635", "SUCCESS": "#9DC8A8",
 }
 
 UI_TEXT = {
@@ -370,36 +371,6 @@ class SoftScrollbar(tk.Canvas):
             return
         fraction = max(0.0, min(1.0, y / available))
         self.command("moveto", fraction)
-
-
-def create_grid_backdrop(root: tk.Misc) -> tk.Canvas:
-    """Create the shared low-contrast futuristic grid behind every screen."""
-    canvas = tk.Canvas(root, bg=BG, bd=0, highlightthickness=0, relief="flat")
-
-    def redraw(_event=None) -> None:
-        try:
-            width, height = max(1, canvas.winfo_width()), max(1, canvas.winfo_height())
-            canvas.delete("all")
-            # Soft burgundy glow zones keep the grid atmospheric without bright colors.
-            canvas.create_oval(-width // 3, height // 3, width // 2, height + height // 2,
-                               fill="#180B10", outline="")
-            canvas.create_oval(width // 2, -height // 3, width + width // 3, height // 2,
-                               fill="#15090D", outline="")
-            step = 42
-            for x in range(0, width + step, step):
-                canvas.create_line(x, 0, x, height, fill="#241217", width=1)
-            for y in range(0, height + step, step):
-                canvas.create_line(0, y, width, y, fill="#241217", width=1)
-            canvas.create_line(0, height // 2, width, height // 2, fill="#2B151C", width=1)
-        except tk.TclError:
-            pass
-
-    canvas.bind("<Configure>", redraw)
-    # This is a true background layer. Using pack here would consume the
-    # layout space and hide the actual screen widgets on startup.
-    canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
-    canvas.lower()
-    return canvas
 
 
 DISCORD_DETECTABLE_URL = "https://discord.com/api/v10/applications/detectable"
@@ -896,7 +867,6 @@ class QuestCompleterApp:
             widget.destroy()
 
     def _auth_header(self, subtitle: str) -> None:
-        create_grid_backdrop(self.root)
         header = tk.Frame(self.root, bg=BG)
         header.pack(fill="x", padx=30, pady=(22, 15))
         logo_slot = tk.Frame(header, width=46, height=46, bg=BG)
@@ -977,7 +947,6 @@ class QuestCompleterApp:
         self._clear_root()
         self.auth_screen = "splash"
         self.splash_angle = 0
-        create_grid_backdrop(self.root)
         self.splash_panel = tk.Frame(self.root, bg=BG)
         self.splash_panel.pack(fill="both", expand=True)
         center = tk.Frame(self.splash_panel, bg=BG)
@@ -1375,30 +1344,25 @@ class QuestCompleterApp:
         return RoundedSurface(parent, fill=PANEL, radius=20, width=width, height=height, background=BG)
 
     def build_ui(self) -> None:
-        create_grid_backdrop(self.root)
-        header_surface = RoundedSurface(self.root, fill=PANEL, radius=18, width=1120, height=68, background=BG)
-        header_surface.pack(fill="x", padx=24, pady=(18, 14))
-        header = header_surface.content
-        header.pack_propagate(False)
-        rtl = self.appearance_settings.get("language") == "ar"
-        self.build_account_widget(header, side="left" if rtl else "right")
-        # شريط علوي موحّد يعرض الهوية والحساب من دون تغيير أي سلوك.
-        logo_slot = tk.Frame(header, width=46, height=46, bg=PANEL)
-        logo_slot.pack(side="right" if rtl else "left", padx=(0, 13))
+        header = tk.Frame(self.root, bg=BG)
+        header.pack(fill="x", padx=30, pady=(22, 15))
+        self.build_account_widget(header)
+        # شعار ثابت وواضح يسار اسم التطبيق في رأس النافذة.
+        logo_slot = tk.Frame(header, width=46, height=46, bg=BG)
+        logo_slot.pack(side="left", padx=(0, 13))
         logo_slot.pack_propagate(False)
-        self.header_logo = tk.Label(logo_slot, bg=PANEL)
+        self.header_logo = tk.Label(logo_slot, bg=BG)
         self.header_logo.pack(fill="both", expand=True)
         self.load_logo(self.header_logo)
-        labels = tk.Frame(header, bg=PANEL)
-        labels.pack(side="right" if rtl else "left", fill="x", expand=True)
-        anchor = "e" if rtl else "w"
-        tk.Label(labels, text=APP_NAME, bg=PANEL, fg=TEXT, font=("Segoe UI", 17, "bold")).pack(anchor=anchor)
-        tk.Label(labels, text="Sba3 Dev - 2026", bg=PANEL, fg=TEXT_DIM,
-                 font=("Segoe UI", 9)).pack(anchor=anchor)
-        tk.Label(labels, text=self.tr("current_tool_version", version=VERSION), bg=PANEL, fg=MUTED,
-                 font=("Segoe UI", 8)).pack(anchor=anchor)
+        labels = tk.Frame(header, bg=BG)
+        labels.pack(side="left", fill="x", expand=True)
+        tk.Label(labels, text=APP_NAME, bg=BG, fg=TEXT, font=("Segoe UI", 19, "bold")).pack(anchor="w")
+        tk.Label(labels, text="Sba3 Dev - 2026", bg=BG, fg=TEXT_DIM,
+                 font=("Segoe UI", 9)).pack(anchor="w")
+        tk.Label(labels, text=self.tr("current_tool_version", version=VERSION), bg=BG, fg=MUTED,
+                 font=("Segoe UI", 8)).pack(anchor="w")
         body = tk.Frame(self.root, bg=BG)
-        body.pack(fill="both", expand=True, padx=24, pady=(0, 14))
+        body.pack(fill="both", expand=True, padx=28, pady=(0, 14))
         body.grid_columnconfigure(0, weight=3, minsize=570)
         body.grid_columnconfigure(1, weight=1, minsize=310)
         body.grid_rowconfigure(0, weight=1)
@@ -1411,19 +1375,18 @@ class QuestCompleterApp:
         self.build_library()
         self.build_queue()
         footer = tk.Frame(self.root, bg=BG)
-        footer.pack(fill="x", padx=28, pady=(0, 14))
+        footer.pack(fill="x", padx=30, pady=(0, 16))
         self.status = tk.Label(footer, text=self.tr("ready"), bg=BG, fg=MUTED, font=("Segoe UI", 9, "bold"), anchor="w")
         self.status.pack(side="left")
         self.library_count = tk.Label(footer, text=self.tr("featured_games"), bg=BG, fg=TEXT_DIM,
                                       font=("Segoe UI", 9, "bold"), anchor="e")
         self.library_count.pack(side="right")
 
-    def build_account_widget(self, parent: tk.Frame, side: str = "right") -> None:
-        bar_bg = str(parent.cget("bg"))
-        account = tk.Frame(parent, bg=bar_bg)
-        account.pack(side=side, padx=(18, 0))
+    def build_account_widget(self, parent: tk.Frame) -> None:
+        account = tk.Frame(parent, bg=BG)
+        account.pack(side="right", padx=(18, 0))
         user_info = load_discord_session().get("user") or {}
-        self.account_avatar = tk.Canvas(account, width=34, height=34, bg=bar_bg,
+        self.account_avatar = tk.Canvas(account, width=34, height=34, bg=BG,
                                        highlightthickness=0, bd=0, cursor="hand2")
         self.account_avatar.pack(side="left")
         self.account_avatar_item = self.account_avatar.create_image(17, 17, anchor="center", image="")
@@ -1652,25 +1615,23 @@ class QuestCompleterApp:
             pass
 
     def build_library(self) -> None:
-        rtl = self.appearance_settings.get("language") == "ar"
         top = tk.Frame(self.library_panel, bg=PANEL)
         top.pack(fill="x", padx=22, pady=(20, 10))
         self.results = tk.Label(top, text=self.tr("preparing_library"), bg=PANEL, fg=MUTED, font=("Segoe UI", 9))
-        self.results.pack(side="right" if rtl else "left")
+        self.results.pack(side="left")
         self.search_var = tk.StringVar()
         self.search_var.trace_add("write", self._on_search_change)
         search_surface = RoundedSurface(self.library_panel, fill=INPUT, radius=14, width=580, height=56, background=PANEL)
         search_surface.pack(fill="x", padx=22, pady=(0, 4))
         search_box = search_surface.content
-        tk.Label(search_box, text="⌕", bg=INPUT, fg=RED, font=("Segoe UI Symbol", 15, "bold"), width=2).pack(
-            side="right" if rtl else "left", padx=(8, 3))
+        tk.Label(search_box, text="⌕", bg=INPUT, fg=TEXT_DIM, font=("Segoe UI Symbol", 15, "bold"), width=2).pack(side="left", padx=(8, 3))
         search = tk.Entry(search_box, textvariable=self.search_var, bg=INPUT, fg=TEXT, insertbackground=TEXT,
                           selectbackground=RED, selectforeground="white", exportselection=False, relief="flat",
-                          highlightthickness=0, font=("Segoe UI", 11), justify="right" if rtl else "left")
-        search.pack(side="right" if rtl else "left", fill="x", expand=True, ipady=7, pady=1)
+                          highlightthickness=0, font=("Segoe UI", 11))
+        search.pack(side="left", fill="x", expand=True, ipady=7, pady=1)
         clear = PillButton(search_box, text="×", command=self.clear_search, fill=INPUT, hover_fill=CARD_HOVER,
                            text_color=TEXT_DIM, font=("Segoe UI", 13), width=30, height=30, background=INPUT)
-        clear.pack(side="left" if rtl else "right", padx=(3, 7), pady=7)
+        clear.pack(side="right", padx=(3, 7), pady=7)
         self.search_entry = search
         self.search_clear_button = clear
         # Keep bindings local to the search control so Arabic IME input is never intercepted globally.
@@ -1679,8 +1640,7 @@ class QuestCompleterApp:
         search.bind("<Shift-Insert>", self._paste_search)
         search.bind("<Button-3>", self._show_search_menu)
         search.bind("<Escape>", lambda _event: self.clear_search() or "break")
-        tk.Label(self.library_panel, text=self.tr("search_hint"), bg=PANEL, fg=MUTED, font=("Segoe UI", 8)).pack(
-            anchor="e" if rtl else "w", padx=24, pady=(0, 10))
+        tk.Label(self.library_panel, text=self.tr("search_hint"), bg=PANEL, fg=MUTED, font=("Segoe UI", 8)).pack(anchor="w", padx=24, pady=(0, 10))
         search.focus_set()
         outer = tk.Frame(self.library_panel, bg=PANEL)
         outer.pack(fill="both", expand=True, padx=17, pady=(0, 10))
@@ -2077,20 +2037,18 @@ class QuestCompleterApp:
         surface.pack(fill="x", padx=3, pady=5)
         card = surface.content
         card.surface = surface
-        rtl = self.appearance_settings.get("language") == "ar"
         icon_slot = tk.Frame(card, width=54, height=54, bg=CARD)
-        icon_slot.pack(side="right" if rtl else "left", padx=(14, 8), pady=8)
+        icon_slot.pack(side="left", padx=(14, 8), pady=8)
         icon_slot.pack_propagate(False)
         initials = game["_public_name"][:1].upper() or "?"
         icon = tk.Label(icon_slot, text=initials, bg=CARD, fg=RED, font=("Segoe UI", 18, "bold"))
         icon.pack(expand=True)
         info = tk.Frame(card, bg=CARD)
-        info.pack(side="right" if rtl else "left", fill="x", expand=True, pady=8)
-        tk.Label(info, text=game["_public_name"], bg=CARD, fg=TEXT, font=("Segoe UI", 10, "bold"),
-                 anchor="e" if rtl else "w").pack(fill="x")
+        info.pack(side="left", fill="x", expand=True, pady=8)
+        tk.Label(info, text=game["_public_name"], bg=CARD, fg=TEXT, font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x")
         add = PillButton(card, text=self.tr("add"), command=lambda g=game: self.add_to_queue(g), fill=RED,
                          hover_fill=RED_HOVER, width=76, height=32, background=CARD)
-        add.pack(side="left" if rtl else "right", padx=14, pady=16)
+        add.pack(side="right", padx=14, pady=16)
         for widget in (surface, card, icon_slot, icon, info):
             widget.bind("<Enter>", lambda _e, c=card: self.hover_card(c, CARD_HOVER))
             widget.bind("<Leave>", lambda _e, c=card: self.hover_card(c, CARD))
@@ -2216,26 +2174,25 @@ class QuestCompleterApp:
             surface = RoundedSurface(self.queue, fill=CARD, radius=13, width=292, height=card_height, background=PANEL)
             surface.pack(fill="x", pady=5)
             row = surface.content
-            rtl = self.appearance_settings.get("language") == "ar"
             details = tk.Frame(row, bg=CARD)
-            details.pack(side="right" if rtl else "left", fill="x", expand=True, padx=(13, 4), pady=10)
+            details.pack(side="left", fill="x", expand=True, padx=(13, 4), pady=10)
             tk.Label(details, text=quest["_public_name"], bg=CARD, fg=TEXT, anchor="w", wraplength=145,
-                     font=("Segoe UI", 9, "bold")).pack(fill="x", anchor="e" if rtl else "w")
+                     font=("Segoe UI", 9, "bold")).pack(fill="x", anchor="w")
             if running:
                 duration = tk.Label(details, text=self._active_duration_text(self.active_simulations[qid]), bg=CARD,
-                                    fg=SUCCESS, anchor="e" if rtl else "w", font=("Segoe UI", 8, "bold"))
-                duration.pack(anchor="e" if rtl else "w", pady=(3, 0))
+                                    fg=SUCCESS, anchor="w", font=("Segoe UI", 8, "bold"))
+                duration.pack(anchor="w", pady=(3, 0))
                 self.activity_duration_labels[qid] = duration
                 action = PillButton(row, text=self.tr("stop"), fill=RED_DARK, hover_fill=RED_DARK_HOVER, width=58, height=30,
                                     background=CARD, command=lambda key=qid: self.stop_single_simulation(key))
             else:
                 action = PillButton(row, text=self.tr("run"), fill=RED, hover_fill=RED_HOVER, width=58, height=30,
                                     background=CARD, command=lambda item=quest: self.run_best_platform(item))
-            action.pack(side="left" if rtl else "right", padx=(1, 4), pady=15)
+            action.pack(side="right", padx=(1, 4), pady=15)
             remove = PillButton(row, text="×", fill=CARD, hover_fill=CARD_HOVER, text_color=TEXT_DIM,
                                 font=("Segoe UI", 13), width=30, height=30, background=CARD,
                                 command=lambda key=qid: self.remove_from_queue(key))
-            remove.pack(side="left" if rtl else "right", pady=15)
+            remove.pack(side="right", pady=15)
         self._refresh_scroll_region(self.queue_canvas)
         self._schedule_activity_duration_refresh()
 
