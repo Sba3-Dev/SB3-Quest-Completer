@@ -14,6 +14,11 @@ class WebUiBridge:
 
     def __init__(self, *, state_provider: Callable[[], dict[str, Any]] | None = None,
                  on_refresh: Callable[[], None] | None = None,
+                 on_login: Callable[[], None] | None = None,
+                 on_support: Callable[[], None] | None = None,
+                 on_membership: Callable[[], None] | None = None,
+                 on_logout: Callable[[], None] | None = None,
+                 on_update: Callable[[], None] | None = None,
                  on_add: Callable[[str], None] | None = None,
                  on_remove: Callable[[str], None] | None = None,
                  on_run: Callable[[str], None] | None = None,
@@ -21,6 +26,8 @@ class WebUiBridge:
                  on_stop_all: Callable[[], None] | None = None) -> None:
         self._state_provider = state_provider or (lambda: {})
         self._on_refresh = on_refresh
+        self._on_login, self._on_support = on_login, on_support
+        self._on_membership, self._on_logout, self._on_update = on_membership, on_logout, on_update
         self._on_add, self._on_remove = on_add, on_remove
         self._on_run, self._on_stop, self._on_stop_all = on_run, on_stop, on_stop_all
 
@@ -31,6 +38,26 @@ class WebUiBridge:
     def refresh_library(self) -> None:
         if self._on_refresh:
             self._on_refresh()
+
+    def open_login(self) -> None:
+        if self._on_login:
+            self._on_login()
+
+    def open_support(self) -> None:
+        if self._on_support:
+            self._on_support()
+
+    def refresh_membership(self) -> None:
+        if self._on_membership:
+            self._on_membership()
+
+    def logout(self) -> None:
+        if self._on_logout:
+            self._on_logout()
+
+    def install_update(self) -> None:
+        if self._on_update:
+            self._on_update()
 
     def add_to_queue(self, game_id: str) -> None:
         if self._on_add and isinstance(game_id, str) and game_id.strip():

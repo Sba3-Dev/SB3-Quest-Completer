@@ -1,35 +1,29 @@
 <!doctype html>
 <html lang="en" dir="ltr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SB3 Quest Completer</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SB3 Quest Completer</title><link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
-  <div class="grid-layer" aria-hidden="true"></div>
-  <div class="app-shell">
-    <header class="topbar">
-      <div class="brand"><div class="brand-mark">SB3</div><div><strong>SB3 Quest Completer</strong><span id="brand-subtitle">Sba3 Dev · 2026</span></div></div>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div><div class="grid-layer" aria-hidden="true"></div>
+  <section id="splash-screen" class="screen splash-screen"><img class="splash-logo" src="logo.ico" alt="SB3"><h1>Welcome To SB3 Tool</h1><div class="loader-ring"></div></section>
+  <section id="auth-screen" class="screen auth-screen" hidden>
+    <header class="auth-header"><img class="app-logo" src="logo.ico" alt="SB3"><div><strong>SB3 Quest Completer</strong><span>Sba3 Dev · 2026</span><small id="auth-version">v0.6.4</small></div></header>
+    <div class="auth-card" id="login-panel"><img class="auth-logo" src="logo.ico" alt="SB3"><h1>Sign in with Discord</h1><p>Sign in with your Discord account to continue.</p><button id="login-button" class="primary-button auth-button">Sign in with Discord</button></div>
+    <div class="auth-card" id="membership-panel" hidden><img class="auth-logo" src="logo.ico" alt="SB3"><h1>Join the SB3 server</h1><p>Join the server, then return here to verify your membership.</p><button id="join-button" class="primary-button auth-button">Join the server</button><button id="refresh-membership" class="secondary-button auth-button">Refresh membership</button></div>
+    <div class="auth-card" id="update-panel" hidden><img class="auth-logo" src="logo.ico" alt="SB3"><h1>A new update is available</h1><p>Current version: <b id="current-version">v0.6.4</b><br>New version: <b id="new-version">--</b></p><button id="update-button" class="primary-button auth-button">Update now</button><button id="skip-update" class="secondary-button auth-button">Continue</button></div>
+    <footer class="auth-footer"><span>SB3 Quest Completer</span><span id="auth-status"></span></footer>
+  </section>
+  <div id="dashboard" class="app-shell" hidden>
+    <header class="topbar"><div class="brand"><img id="brand-logo" class="brand-logo" src="logo.ico" alt="SB3"><div><strong>SB3 Quest Completer</strong><span id="brand-subtitle">Sba3 Dev · 2026</span><small id="brand-version">v0.6.4</small></div></div>
       <div class="search-wrap"><span class="search-icon">⌕</span><input id="search" type="search" placeholder="Search games or Discord task ID" autocomplete="off"><kbd>Ctrl</kbd><kbd>K</kbd></div>
-      <button class="avatar" id="account-button" type="button" aria-label="Account">SB</button>
+      <button class="avatar" id="account-button" type="button" aria-label="Account"><img id="account-avatar" alt=""><span id="account-initials">SB</span></button>
+      <div id="account-menu" class="account-menu" hidden><div class="account-menu-head"><img id="menu-avatar" alt=""><div><strong id="menu-name">Discord user</strong><span id="menu-handle"></span></div><button id="close-menu">×</button></div><button data-account-action="settings">Settings</button><button data-account-action="support">Support</button><button data-account-action="logout">Sign out</button></div>
     </header>
-    <div class="workspace">
-      <main class="library-column">
-        <section class="hero-card"><div><p class="eyebrow">DISCORD QUEST LIBRARY</p><h1 id="hero-title">Choose your next quest</h1><p id="hero-copy">Browse verified games and add them to your queue.</p></div><div class="hero-orb">✦</div></section>
-        <div class="section-heading"><div><h2>Featured games</h2><span id="library-count">Preparing your library</span></div><span id="connection-state" class="state-dot"><i></i> Ready</span></div>
-        <section id="game-grid" class="game-grid" aria-live="polite"></section>
-        <button id="load-more" class="ghost-button" type="button" hidden>Load more</button>
-      </main>
-      <aside class="queue-column">
-        <div class="queue-heading"><div><h2>Quest queue</h2><span id="queue-count">0 selected</span></div><button id="stop-all" class="danger-button" type="button" hidden>Stop all</button></div>
-        <div id="queue-list" class="queue-list" aria-live="polite"></div>
-        <footer class="status-card"><div class="status-line"><i class="pulse"></i><span id="status-text">Ready</span></div><span id="version-text">v0.6.3</span></footer>
-      </aside>
+    <div class="workspace"><main class="library-column"><div class="section-heading"><div><h2>Featured Discord games</h2><span id="library-count">Preparing your library</span></div><span id="connection-state" class="state-dot"><i></i> Ready</span></div><section id="game-grid" class="game-grid" aria-live="polite"></section><button id="load-more" class="ghost-button" type="button" hidden>Load more</button></main>
+      <aside class="queue-column"><div class="queue-heading"><div><h2>Quest queue</h2><span id="queue-count">0 selected</span></div><button id="stop-all" class="danger-button" type="button" hidden>Stop all</button></div><div id="queue-list" class="queue-list" aria-live="polite"></div><footer class="status-card"><div class="status-line"><i class="pulse"></i><span id="status-text">Ready</span></div><span id="version-text">v0.6.4</span></footer></aside>
     </div>
   </div>
-  <div id="toast" class="toast" role="status"></div>
-  <script src="app.js"></script>
+  <div id="toast" class="toast" role="status"></div><script src="app.js"></script>
 </body>
 </html>

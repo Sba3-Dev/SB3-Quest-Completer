@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 import time
+import webbrowser
 from pathlib import Path
 from typing import Any
 
@@ -43,10 +44,17 @@ class WebRuntime:
 
     def bootstrap(self) -> dict[str, Any]:
         session = self.mina.load_discord_session()
+        user = session.get("user") or {}
+        user_id = str(user.get("id") or "")
+        avatar_hash = str(user.get("avatar") or "")
+        avatar = (f"https://cdn.discordapp.com/avatars/{user_id}/{avatar_hash}.png?size=128"
+                  if user_id and avatar_hash else
+                  f"https://cdn.discordapp.com/embed/avatars/{int(user_id) % 5 if user_id.isdigit() else 0}.png")
         return {
             "version": self.mina.VERSION,
             "authenticated": bool(session.get("access_token")),
-            "user": session.get("user") or {},
+            "user": user,
+            "avatar": avatar,
             "games": self._public_games(),
             "queue": self._public_queue(),
         }
@@ -56,6 +64,55 @@ class WebRuntime:
             self._notify("Requests is not installed")
             return
         threading.Thread(target=self._load_library, daemon=True, name="sb3-web-library").start()
+
+    def open_login(self) -> None:
+        threading.Thread(target=self._login_worker, daemon=True, name="sb3-web-login").start()
+
+    def _login_worker(self) -> None:
+        try:
+            # Reuse the existing OAuth callback and token exchange, but force its
+            # login helper to use the system browser rather than a nested WebView.
+            old_webview = self.mina.webview
+            self.mina.webview = None
+            try:
+                valid, reason = self.mina.discord_login()
+            finally:
+                self.mina.webview = old_webview
+            if valid:
+                self._evaluate("window.sb3Web.showScreen('main'); window.pywebview.api.bootstrap().then(window.sb3Web.bootstrap)")
+                self.refresh_library()
+            elif reason == "not_in_guild":
+                self._evaluate("window.sb3Web.showScreen('membership')")
+            else:
+                self._notify("Discord login could not be completed")
+        except Exception as exc:
+            self._notify(f"Login failed: {exc}")
+
+    def open_support(self) -> None:
+        webbrowser.open_new_tab(self.mina.SUPPORT_DISCORD_URL)
+
+    def refresh_membership(self) -> None:
+        def worker() -> None:
+            try:
+                valid, _reason = self.mina.check_saved_discord_session(force_refresh=True)
+                if valid:
+                    self._evaluate("window.sb3Web.showScreen('main'); window.pywebview.api.bootstrap().then(window.sb3Web.bootstrap)")
+                    self.refresh_library()
+                else:
+                    self._notify("You are not a member of the required server yet")
+            except Exception as exc:
+                self._notify(f"Membership check failed: {exc}")
+        threading.Thread(target=worker, daemon=True, name="sb3-web-membership").start()
+
+    def logout(self) -> None:
+        self.stop_all()
+        self.mina.clear_discord_session()
+        self._evaluate("window.sb3Web.showScreen('login')")
+
+    def install_update(self) -> None:
+        # The current release page remains the safe update entry point until the
+        # HTML download-progress adapter is added; this keeps the action usable.
+        webbrowser.open_new_tab("https://github.com/Sba3-Dev/SB3-Quest-Completer/releases/latest")
 
     def _load_library(self) -> None:
         try:
@@ -177,7 +234,10 @@ class WebRuntime:
     def _public_games(self) -> list[dict[str, Any]]:
         with self.lock:
             return [{"id": g.get("id"), "name": g.get("_public_name") or g.get("name"),
-                     "platform": (g.get("_platforms") or [None])[0]} for g in self.games]
+                     "platform": (g.get("_platforms") or [None])[0],
+                     "icon": (self.mina.DISCORD_ICON_URL.format(app_id=g.get("id"),
+                                                                 icon_hash=g.get("icon_hash") or g.get("icon"))
+                              if (g.get("icon_hash") or g.get("icon")) else "")} for g in self.games]
 
     def _public_queue(self) -> list[dict[str, Any]]:
         with self.lock:
@@ -214,6 +274,11 @@ def launch_web_ui() -> bool:
     bridge = WebUiBridge(
         state_provider=lambda: runtime_holder["runtime"].bootstrap() if "runtime" in runtime_holder else {},
         on_refresh=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_library(),
+        on_login=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_login(),
+        on_support=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_support(),
+        on_membership=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_membership(),
+        on_logout=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].logout(),
+        on_update=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].install_update(),
         on_add=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].add_to_queue(game_id),
         on_remove=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].remove_from_queue(game_id),
         on_run=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].run_quest(game_id),

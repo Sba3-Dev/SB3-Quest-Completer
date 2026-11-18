@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.6.4"
+VERSION = "0.6.5"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -756,35 +756,10 @@ def platforms_for_game(game: dict[str, Any]) -> tuple[str, ...]:
 
 
 def run_game_process(game_name: str, platform: str, stop_signal: str = "") -> None:
-    """Run a real hidden system window so the activity remains a detectable background process."""
-    root = tk.Tk()
-    root.title(f"Active: {game_name}")
-    # Keep a genuine top-level window alive for the background task, but make it borderless and off-screen.
-    # Unlike withdraw(), this preserves the OS window handle while never presenting a second UI to the user.
-    root.overrideredirect(True)
-    root.geometry("1x1-32000-32000")
-    root.configure(bg=BG)
-    root.update_idletasks()
+    """Keep a detectable background process alive without creating a Tk window."""
     signal_path = Path(stop_signal) if stop_signal else None
-
-    def stop_session() -> None:
-        try:
-            root.destroy()
-        except tk.TclError:
-            pass
-
-    def watch_parent_stop() -> None:
-        try:
-            if signal_path and signal_path.exists():
-                stop_session()
-                return
-            root.after(250, watch_parent_stop)
-        except tk.TclError:
-            pass
-
-    root.protocol("WM_DELETE_WINDOW", stop_session)
-    watch_parent_stop()
-    root.mainloop()
+    while not signal_path or not signal_path.exists():
+        time.sleep(0.25)
 
 
 class PlatformSelector(tk.Toplevel):
@@ -2365,20 +2340,16 @@ def main() -> None:
         run_game_process(sys.argv[index + 1], sys.argv[index + 2], stop_signal)
         return
 
-    # The HTML frontend is opt-in until it has been verified on the target
-    # Windows WebView2 runtime. Any import, session, or window failure falls
-    # through to the unchanged Tk frontend instead of making the app unusable.
-    if os.getenv("SB3_WEB_UI", "1") == "1":
-        try:
-            from webui.runtime import launch_web_ui
-            if launch_web_ui():
-                return
-        except Exception:
-            pass
-
-    root = tk.Tk()
-    QuestCompleterApp(root)
-    root.mainloop()
+    # HTML/CSS is now the only application UI. WebView2/pywebview failures are
+    # reported instead of silently reopening the legacy Tk interface.
+    try:
+        from webui.runtime import launch_web_ui
+        if not launch_web_ui():
+            raise SystemExit("SB3 HTML interface could not start. Install WebView2 and restart the app.")
+    except SystemExit:
+        raise
+    except Exception as exc:
+        raise SystemExit(f"SB3 HTML interface failed: {exc}") from exc
 
 if __name__ == "__main__":
     main()
