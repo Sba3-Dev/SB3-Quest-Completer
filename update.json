@@ -1,9 +1,9 @@
 {
-  "sha256": "a7e584a52c0c0679e96340defdc671f1eeeecf707f024e8750a088db5dddcbc9",
-  "package_size": 32453803,
-  "installer_url": "https://github.com/Sba3-Dev/SB3-Quest-Completer/releases/download/v0.6.7/SB3QuestCompleter-Setup.exe",
-  "package_sha256": "12de77a241d8067b4eb8f77954802ad9d0442b2f9c0cb6cca33e263cde6639fb",
-  "version": "0.6.7",
-  "size": 34662455,
-  "package_url": "https://github.com/Sba3-Dev/SB3-Quest-Completer/releases/download/v0.6.7/SB3QuestCompleter-Update.zip"
+  "installer_url": "https://github.com/Sba3-Dev/SB3-Quest-Completer/releases/download/v0.6.8/SB3QuestCompleter-Setup.exe",
+  "package_size": 32455537,
+  "version": "0.6.8",
+  "size": 34665270,
+  "package_sha256": "9b5a777c0e2c8fb3127d7a8878e1acb1ecd5faa0152d052efbd216a8dd911a7e",
+  "sha256": "aaebccb3b5aa07648496bffb29f38101a80a78fd9d2fbab0f1d3391996886b3f",
+  "package_url": "https://github.com/Sba3-Dev/SB3-Quest-Completer/releases/download/v0.6.8/SB3QuestCompleter-Update.zip"
 }
