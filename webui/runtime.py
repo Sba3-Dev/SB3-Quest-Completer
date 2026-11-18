@@ -274,19 +274,21 @@ class WebRuntime:
             self.queue = [g for g in self.queue if str(g.get("id")) != game_id]
         self._sync_queue()
 
-    def run_quest(self, game_id: str) -> None:
+    def run_quest(self, game_id: str) -> bool:
         with self.lock:
             quest = next((g for g in self.queue if str(g.get("id")) == game_id), None)
         if not quest or game_id in self.active:
-            return
+            return False
         platforms = self.mina.platforms_for_game(quest) or tuple(quest.get("_platforms") or ())
         if not platforms:
             self._notify("No verified PC launcher found")
-            return
+            return False
         try:
             self._start_process(quest, platforms[0])
         except Exception as exc:
             self._notify(f"Launch failed: {exc}")
+            return False
+        return True
 
     def _start_process(self, quest: dict[str, Any], platform: str) -> None:
         qid = str(quest["id"])
@@ -323,6 +325,7 @@ class WebRuntime:
             self.active[qid] = {"proc": proc, "stop_signal": stop_signal,
                                  "session_path": Path.cwd() / "games" / qid,
                                  "started_at": time.monotonic(), "rpc": rpc,
+                                 "started_epoch": int(time.time()),
                                  "platform": platform,
                                  "display_name": quest.get("_public_name") or quest.get("name")}
         self._sync_queue()
@@ -337,11 +340,12 @@ class WebRuntime:
             with self.lock:
                 if qid not in self.active:
                     return
+                started_epoch = int(self.active[qid].get("started_epoch") or time.time())
             if proc.poll() is not None:
                 return
             try:
                 rpc.update(state=f"Quest Active ({platform})", details=f"Playing {quest['name']}",
-                           start=int(time.time()), instance=False)
+                           start=started_epoch, instance=False)
             except Exception:
                 return
             time.sleep(15)
@@ -404,7 +408,9 @@ class WebRuntime:
     def _public_queue(self) -> list[dict[str, Any]]:
         with self.lock:
             return [{"id": g.get("id"), "name": g.get("_public_name") or g.get("name"),
-                     "running": str(g.get("id")) in self.active} for g in self.queue]
+                     "running": str(g.get("id")) in self.active,
+                     "elapsed": int(max(0, time.monotonic() - self.active[str(g.get("id"))]["started_at"]))
+                     if str(g.get("id")) in self.active else 0} for g in self.queue]
 
     def _sync_queue(self) -> None:
         self._evaluate("window.sb3Web.setQueue(%s)" % self._json(self._public_queue()))

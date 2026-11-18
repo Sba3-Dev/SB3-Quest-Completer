@@ -75,9 +75,11 @@ class WebUiBridge:
         if self._on_remove and isinstance(game_id, str) and game_id.strip():
             self._on_remove(game_id.strip())
 
-    def run_quest(self, game_id: str) -> None:
+    def run_quest(self, game_id: str) -> bool:
         if self._on_run and isinstance(game_id, str) and game_id.strip():
-            self._on_run(game_id.strip())
+            result = self._on_run(game_id.strip())
+            return result is not False
+        return False
 
     def stop_quest(self, game_id: str) -> None:
         if self._on_stop and isinstance(game_id, str) and game_id.strip():
