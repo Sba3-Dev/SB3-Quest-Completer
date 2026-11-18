@@ -45,6 +45,7 @@ class WebRuntime:
         session = self.mina.load_discord_session()
         return {
             "version": self.mina.VERSION,
+            "authenticated": bool(session.get("access_token")),
             "user": session.get("user") or {},
             "games": self._public_games(),
             "queue": self._public_queue(),
@@ -204,13 +205,10 @@ class WebRuntime:
 
 
 def launch_web_ui() -> bool:
-    """Launch only when explicitly enabled and a valid saved Discord session exists."""
-    if not webview or os.getenv("SB3_WEB_UI", "0") != "1":
+    """Launch the HTML dashboard; Tk remains the fallback if WebView2 fails."""
+    if not webview or os.getenv("SB3_WEB_UI", "1") != "1":
         return False
     mina = _module()
-    valid, _reason = mina.check_saved_discord_session(force_refresh=True)
-    if not valid:
-        return False
     runtime_holder: dict[str, WebRuntime] = {}
 
     bridge = WebUiBridge(
