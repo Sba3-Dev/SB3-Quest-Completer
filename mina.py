@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.5.3"
+VERSION = "0.5.4"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -104,6 +104,7 @@ UI_TEXT = {
         "already_queue": "● Game is already in the queue", "added": "● Added: {name}",
         "stopped_tasks": "● Stopped {count} active task(s)",
         "support_title": "Sba3 Dev Support", "support_message": "Join our Discord server for support and updates.",
+        "brand_year": "Sba3 Dev - 2026", "current_tool_version": "(Current tool version: {version})",
         "join_support": "Join Discord server", "logout": "Sign out",
         "auth_subtitle": "Discord access required", "login_title": "Sign in with Discord",
         "login_message": "Sign in with your Discord account to continue.", "login_button": "Sign in with Discord",
@@ -139,6 +140,7 @@ UI_TEXT = {
         "already_queue": "● اللعبة موجودة في قائمة المهام", "added": "● تمت الإضافة: {name}",
         "stopped_tasks": "● تم إيقاف {count} من المهام النشطة",
         "support_title": "دعم Sba3 Dev", "support_message": "انضم إلى سيرفر Discord للدعم والحصول على آخر التحديثات.",
+        "brand_year": "Sba3 Dev - 2026", "current_tool_version": "(الإصدار الحالي للأداة: {version})",
         "join_support": "انضم إلى سيرفر Discord", "logout": "تسجيل الخروج",
         "auth_subtitle": "تسجيل الدخول عبر Discord", "login_title": "تسجيل الدخول عبر Discord",
         "login_message": "سجّل دخولك بحساب Discord للمتابعة إلى الأداة.", "login_button": "تسجيل الدخول عبر Discord",
@@ -1453,16 +1455,22 @@ class QuestCompleterApp:
         menu = tk.Frame(self.root, bg=BG, highlightthickness=0, bd=0)
         x = max(8, self.account_avatar.winfo_rootx() - self.root.winfo_rootx() - 228)
         y = max(8, self.account_avatar.winfo_rooty() - self.root.winfo_rooty())
-        menu.place(x=x, y=y, width=220, height=205)
+        menu.place(x=x, y=y, width=220, height=235)
         menu.lift()
         self.account_menu = menu
-        surface = RoundedSurface(menu, fill=PANEL, radius=16, width=220, height=205, background=PANEL)
+        surface = RoundedSurface(menu, fill=PANEL, radius=16, width=220, height=235, background=PANEL)
         surface.pack(fill="both", expand=True)
         content = surface.content
         user_info = load_discord_session().get("user") or {}
-        top = tk.Frame(content, bg=PANEL, height=40)
+        top = tk.Frame(content, bg=PANEL, height=64)
         top.pack(fill="x", padx=12, pady=(12, 8))
         top.pack_propagate(False)
+        close_button = tk.Button(top, text="×", command=self._close_account_menu,
+                                 bg=PANEL, activebackground=PANEL, fg=TEXT_DIM,
+                                 activeforeground=TEXT, relief="flat", bd=0,
+                                 highlightthickness=0, cursor="hand2",
+                                 font=("Segoe UI", 12, "bold"))
+        close_button.pack(side="right", anchor="ne", padx=(4, 0))
         popup_avatar = tk.Canvas(top, width=34, height=34, bg=PANEL, highlightthickness=0, bd=0)
         popup_avatar.pack(side="left")
         self.account_popup_avatar = popup_avatar
@@ -1475,8 +1483,14 @@ class QuestCompleterApp:
             popup_avatar.itemconfigure(self.account_popup_image_item, image=self.account_avatar_thumb_image, state="normal")
             popup_avatar.itemconfigure(self.account_popup_fallback, state="hidden")
         username = str(user_info.get("global_name") or user_info.get("username") or "Discord user")
-        tk.Label(top, text=username, bg=PANEL, fg=TEXT, font=("Segoe UI", 9, "bold"),
-                 anchor="w").pack(side="left", fill="x", expand=True, padx=(9, 0))
+        identity = tk.Frame(top, bg=PANEL)
+        identity.pack(side="left", fill="both", expand=True, padx=(9, 0))
+        tk.Label(identity, text=username, bg=PANEL, fg=TEXT, font=("Segoe UI", 9, "bold"),
+                 anchor="w").pack(fill="x")
+        tk.Label(identity, text=self.tr("brand_year"), bg=PANEL, fg=TEXT_DIM,
+                 font=("Segoe UI", 8), anchor="w").pack(fill="x")
+        tk.Label(identity, text=self.tr("current_tool_version", version=VERSION), bg=PANEL, fg=MUTED,
+                 font=("Segoe UI", 7), anchor="w").pack(fill="x")
         for label, command in ((self.tr("settings"), self.open_settings_panel),
                                (self.tr("support"), self.open_support_panel),
                                (self.tr("logout"), self.logout)):
@@ -1484,6 +1498,11 @@ class QuestCompleterApp:
                                 fill=CARD, hover_fill=CARD_HOVER, text_color=TEXT, width=176, height=32,
                                 background=PANEL)
             button.pack(pady=3)
+
+    def _close_account_menu(self) -> None:
+        if getattr(self, "account_menu", None) and self.account_menu.winfo_exists():
+            self.account_menu.destroy()
+        self.account_menu = None
 
     def _account_action(self, action: Callable[[], None]) -> None:
         if getattr(self, "account_menu", None) and self.account_menu.winfo_exists():
