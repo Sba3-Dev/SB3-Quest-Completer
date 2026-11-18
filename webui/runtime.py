@@ -244,19 +244,57 @@ class WebRuntime:
                    if getattr(sys, "frozen", False) else
                    [sys.executable, str(temp_exe), "--run-game", quest["name"], platform, str(stop_signal)])
         proc = subprocess.Popen(command, cwd=str(base))
+        rpc = None
+        presence = getattr(self.mina, "Presence", None)
+        if presence:
+            for _ in range(3):
+                try:
+                    rpc = presence(str(quest["id"]))
+                    rpc.connect()
+                    rpc.update(state=f"Quest Active ({platform})", details=f"Playing {quest['name']}",
+                               start=int(time.time()), instance=False)
+                    break
+                except Exception:
+                    rpc = None
+                    time.sleep(1)
         with self.lock:
             self.active[qid] = {"proc": proc, "stop_signal": stop_signal,
                                  "session_path": Path.cwd() / "games" / qid,
-                                 "started_at": time.monotonic()}
+                                 "started_at": time.monotonic(), "rpc": rpc,
+                                 "platform": platform,
+                                 "display_name": quest.get("_public_name") or quest.get("name")}
         self._sync_queue()
         threading.Thread(target=self._watch_process, args=(qid, proc), daemon=True,
                          name=f"sb3-web-watch-{qid}").start()
+        if rpc:
+            threading.Thread(target=self._rpc_loop, args=(qid, rpc, proc, quest, platform),
+                             daemon=True, name=f"sb3-web-rpc-{qid}").start()
+
+    def _rpc_loop(self, qid: str, rpc: Any, proc: Any, quest: dict[str, Any], platform: str) -> None:
+        while True:
+            with self.lock:
+                if qid not in self.active:
+                    return
+            if proc.poll() is not None:
+                return
+            try:
+                rpc.update(state=f"Quest Active ({platform})", details=f"Playing {quest['name']}",
+                           start=int(time.time()), instance=False)
+            except Exception:
+                return
+            time.sleep(15)
 
     def _watch_process(self, qid: str, proc: Any) -> None:
         proc.wait()
         with self.lock:
             data = self.active.pop(qid, None)
         if data:
+            rpc = data.get("rpc")
+            if rpc:
+                try:
+                    rpc.close()
+                except Exception:
+                    pass
             shutil.rmtree(data["session_path"], ignore_errors=True)
         self._sync_queue()
 
@@ -276,6 +314,12 @@ class WebRuntime:
                     proc.kill()
         except (OSError, subprocess.TimeoutExpired):
             pass
+        rpc = data.get("rpc")
+        if rpc:
+            try:
+                rpc.close()
+            except Exception:
+                pass
         shutil.rmtree(data["session_path"], ignore_errors=True)
         self._sync_queue()
 

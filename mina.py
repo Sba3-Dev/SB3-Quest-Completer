@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.6.7"
+VERSION = "0.6.8"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -756,8 +756,29 @@ def platforms_for_game(game: dict[str, Any]) -> tuple[str, ...]:
 
 
 def run_game_process(game_name: str, platform: str, stop_signal: str = "") -> None:
-    """Keep a detectable background process alive without creating a Tk window."""
+    """Keep a detectable background activity window alive without creating a Tk UI."""
     signal_path = Path(stop_signal) if stop_signal else None
+    if os.name == "nt":
+        # Discord can use the process/window title when confirming a detectable
+        # activity. Use a native hidden STATIC window instead of Tkinter.
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        title = f"Active: {game_name} ({platform})"
+        hwnd = user32.CreateWindowExW(0, "STATIC", title, 0, -32000, -32000, 1, 1,
+                                      0, 0, kernel32.GetModuleHandleW(None), None)
+        if hwnd:
+            user32.ShowWindow(hwnd, 0)
+        message = wintypes.MSG()
+        while not signal_path or not signal_path.exists():
+            while user32.PeekMessageW(ctypes.byref(message), 0, 0, 0, 1):
+                user32.TranslateMessage(ctypes.byref(message))
+                user32.DispatchMessageW(ctypes.byref(message))
+            time.sleep(0.25)
+        if hwnd:
+            user32.DestroyWindow(hwnd)
+        return
     while not signal_path or not signal_path.exists():
         time.sleep(0.25)
 
