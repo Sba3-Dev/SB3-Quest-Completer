@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.5.4"
+VERSION = "0.5.5"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -104,7 +104,7 @@ UI_TEXT = {
         "already_queue": "● Game is already in the queue", "added": "● Added: {name}",
         "stopped_tasks": "● Stopped {count} active task(s)",
         "support_title": "Sba3 Dev Support", "support_message": "Join our Discord server for support and updates.",
-        "brand_year": "Sba3 Dev - 2026", "current_tool_version": "(Current tool version: {version})",
+        "brand_year": "Sba3 Dev - 2026", "current_tool_version": "(v{version})",
         "join_support": "Join Discord server", "logout": "Sign out",
         "auth_subtitle": "Discord access required", "login_title": "Sign in with Discord",
         "login_message": "Sign in with your Discord account to continue.", "login_button": "Sign in with Discord",
@@ -140,7 +140,7 @@ UI_TEXT = {
         "already_queue": "● اللعبة موجودة في قائمة المهام", "added": "● تمت الإضافة: {name}",
         "stopped_tasks": "● تم إيقاف {count} من المهام النشطة",
         "support_title": "دعم Sba3 Dev", "support_message": "انضم إلى سيرفر Discord للدعم والحصول على آخر التحديثات.",
-        "brand_year": "Sba3 Dev - 2026", "current_tool_version": "(الإصدار الحالي للأداة: {version})",
+        "brand_year": "Sba3 Dev - 2026", "current_tool_version": "(v{version})",
         "join_support": "انضم إلى سيرفر Discord", "logout": "تسجيل الخروج",
         "auth_subtitle": "تسجيل الدخول عبر Discord", "login_title": "تسجيل الدخول عبر Discord",
         "login_message": "سجّل دخولك بحساب Discord للمتابعة إلى الأداة.", "login_button": "تسجيل الدخول عبر Discord",
