@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -847,7 +847,6 @@ class QuestCompleterApp:
         self.in_app_overlay: tk.Frame | None = None
         self.queue_canvas: tk.Canvas | None = None
         self.local_game_paths = self.load_local_game_paths()
-        self.featured_ranks = self.load_featured_ranks()
         self.auth_busy = False
         self.update_cancel_event = threading.Event()
         self.update_temp_path: Path | None = None
@@ -1538,14 +1537,6 @@ class QuestCompleterApp:
         except OSError:
             target.configure(text="SB3", fg=RED, font=("Segoe UI", 18, "bold"))
 
-    def load_featured_ranks(self) -> dict[str, int]:
-        """Load the bundled popular-game manifest; absence degrades gracefully."""
-        try:
-            manifest = json.loads(resource_path("assets/featured_games.json").read_text(encoding="utf-8"))
-            return {str(item["id"]): int(item["rank"]) for item in manifest if "id" in item and "rank" in item}
-        except (OSError, ValueError, TypeError):
-            return {}
-
     def local_game_paths_file(self) -> Path:
         return Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "game_paths.json"
 
@@ -1601,20 +1592,17 @@ class QuestCompleterApp:
         scale = float(self.appearance_settings.get("font_scale", 1.0))
         self.root.tk.call("tk", "scaling", self.base_tk_scaling * scale)
 
-    def bundled_icon_path(self, app_id: str) -> Path:
-        return resource_path(f"assets/icons/{app_id}.png")
-
     def runtime_icon_path(self, app_id: str) -> Path:
         base = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "icons"
         return base / f"{app_id}.png"
 
     def read_local_icon(self, app_id: str) -> bytes | None:
-        for path in (self.bundled_icon_path(app_id), self.runtime_icon_path(app_id)):
-            try:
-                if path.is_file():
-                    return path.read_bytes()
-            except OSError:
-                pass
+        path = self.runtime_icon_path(app_id)
+        try:
+            if path.is_file():
+                return path.read_bytes()
+        except OSError:
+            pass
         return None
 
     def save_runtime_icon(self, app_id: str, raw: bytes) -> None:
