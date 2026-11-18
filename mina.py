@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.5.5"
+VERSION = "0.5.6"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1455,14 +1455,14 @@ class QuestCompleterApp:
         menu = tk.Frame(self.root, bg=BG, highlightthickness=0, bd=0)
         x = max(8, self.account_avatar.winfo_rootx() - self.root.winfo_rootx() - 228)
         y = max(8, self.account_avatar.winfo_rooty() - self.root.winfo_rooty())
-        menu.place(x=x, y=y, width=220, height=235)
+        menu.place(x=x, y=y, width=220, height=220)
         menu.lift()
         self.account_menu = menu
-        surface = RoundedSurface(menu, fill=PANEL, radius=16, width=220, height=235, background=PANEL)
+        surface = RoundedSurface(menu, fill=PANEL, radius=16, width=220, height=220, background=PANEL)
         surface.pack(fill="both", expand=True)
         content = surface.content
         user_info = load_discord_session().get("user") or {}
-        top = tk.Frame(content, bg=PANEL, height=64)
+        top = tk.Frame(content, bg=PANEL, height=48)
         top.pack(fill="x", padx=12, pady=(12, 8))
         top.pack_propagate(False)
         close_button = tk.Button(top, text="×", command=self._close_account_menu,
