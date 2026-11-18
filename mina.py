@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.7.2"
+VERSION = "0.7.3"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -783,6 +783,30 @@ def run_game_process(game_name: str, platform: str, stop_signal: str = "") -> No
     root.protocol("WM_DELETE_WINDOW", stop_session)
     watch_parent_stop()
     root.mainloop()
+
+
+_INSTANCE_MUTEX = None
+
+
+def acquire_single_instance() -> bool:
+    """Allow one dashboard process while leaving --run-game workers unrestricted."""
+    global _INSTANCE_MUTEX
+    if os.name != "nt":
+        return True
+    try:
+        import ctypes
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        mutex = kernel32.CreateMutexW(None, False, "Local\\SB3QuestCompleter.SingleInstance")
+        if not mutex:
+            return True
+        if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+            kernel32.CloseHandle(mutex)
+            return False
+        _INSTANCE_MUTEX = mutex
+        return True
+    except Exception:
+        # Failing to create the guard must not prevent the app from launching.
+        return True
 
 
 class PlatformSelector(tk.Toplevel):
@@ -2361,6 +2385,9 @@ def main() -> None:
         index = sys.argv.index("--run-game")
         stop_signal = sys.argv[index + 3] if len(sys.argv) > index + 3 else ""
         run_game_process(sys.argv[index + 1], sys.argv[index + 2], stop_signal)
+        return
+
+    if not acquire_single_instance():
         return
 
     # HTML/CSS is now the only application UI. WebView2/pywebview failures are
