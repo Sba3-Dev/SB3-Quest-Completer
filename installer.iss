@@ -1,5 +1,5 @@
 #define MyAppName "SB3 Quest Completer"
-#define MyAppVersion "0.7.2"
+#define MyAppVersion "0.6.11"
 #define MyAppPublisher "Sba3 Dev"
 #define MyAppExeName "SB3QuestCompleter.exe"
 
@@ -35,5 +35,4 @@ Name: "desktopicon"; Description: "Add a desktop shortcut"; GroupDescription: "A
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall
-
 

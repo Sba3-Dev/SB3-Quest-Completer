@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-import math
 import base64
 import hashlib
 import http.server
@@ -46,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.7.2"
+VERSION = "0.6.11"
 _SINGLE_INSTANCE_HANDLE = None
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
@@ -56,20 +55,20 @@ UPDATE_MANIFEST_URL = os.getenv(
 )
 # Burgundy Minimal: هرم لوني هادئ وواضح، من دون تباين قاسٍ أو تأثيرات مشتّتة.
 # الخلفية الداكنة الموحّدة تُبقي التركيز على محتوى المكتبة والقوائم.
-BG = "#090609"              # خلفية عميقة تُظهر الشبكة والتوهج بهدوء
-PANEL = "#170B12"           # سطح اللوحات الرئيسية
-CARD = "#24121B"            # بطاقات الألعاب والمهام
-CARD_HOVER = "#351A27"      # تمييز لطيف عند المرور
-INPUT = "#120910"           # حقول الإدخال
-BORDER = "#40202E"          # فواصل وحدود نبيذية
-TEXT = "#F9F0F3"            # نص رئيسي
-TEXT_DIM = "#D2BFC6"         # نص ثانوي
-MUTED = "#9B7D89"            # نص مساعد
-RED = "#B94660"              # لون الإجراء الرئيسي
-RED_HOVER = "#D05B76"        # تفاعل الإجراء الرئيسي
-RED_DARK = "#451523"         # زر الإيقاف
-RED_DARK_HOVER = "#652238"   # تفاعل زر الإيقاف
-SUCCESS = "#86B895"          # حالة النجاح
+BG = "#0E080A"              # خلفية خارجية هادئة ودافئة
+PANEL = "#1B0C10"           # سطح اللوحات الرئيسية
+CARD = "#251217"            # بطاقات الألعاب والمهام
+CARD_HOVER = "#321A20"      # تمييز لطيف عند المرور
+INPUT = "#160A0D"           # حقل البحث، أغمق بدرجة بسيطة لراحة العين
+BORDER = "#3B2026"          # فواصل وحدود خافتة
+TEXT = "#F7EFF0"            # نص رئيسي ناعم وعالي الوضوح
+TEXT_DIM = "#CCB8BC"        # نص ثانوي
+MUTED = "#967B81"           # نص مساعد وخافت
+RED = "#A7474D"             # لون الإجراء الرئيسي
+RED_HOVER = "#B9585E"       # تفاعل هادئ عند المرور
+RED_DARK = "#3D161C"        # زر الإيقاف — أحمر داكن واضح
+RED_DARK_HOVER = "#552128"  # تفاعل زر الإيقاف
+SUCCESS = "#83A38B"         # حالة النجاح
 
 # إعدادات مظهر محلية: الوضع الافتراضي الهادئ ووضع تباين أوضح للقراءة.
 BURGUNDY_PALETTE = {
@@ -84,67 +83,6 @@ HIGH_CONTRAST_PALETTE = {
     "MUTED": "#C5A8AF", "RED": "#CF5D67", "RED_HOVER": "#E16F78",
     "RED_DARK": "#571C26", "RED_DARK_HOVER": "#742635", "SUCCESS": "#9DC8A8",
 }
-
-
-class AnimatedBackdrop(tk.Canvas):
-    """Decorative grid layer; it never handles input or page state."""
-
-    def __init__(self, parent: tk.Misc) -> None:
-        super().__init__(parent, bg=BG, bd=0, highlightthickness=0, takefocus=0)
-        self._job: str | None = None
-        self._phase = 0.0
-        self._blocks: list[tuple[int, int, int, int]] = []
-        self.bind("<Configure>", lambda _event: self._build_scene())
-        self._build_scene()
-        self._animate()
-
-    def _build_scene(self) -> None:
-        if not self.winfo_exists():
-            return
-        self.delete("all")
-        self._blocks = []
-        width, height, cell = max(1, self.winfo_width()), max(1, self.winfo_height()), 78
-        for x in range(-cell, width + cell, cell):
-            self.create_line(x, 0, x, height, fill="#21131B", width=1)
-        for y in range(-cell, height + cell, cell):
-            self.create_line(0, y, width, y, fill="#21131B", width=1)
-        for index, (rx, ry, size, color) in enumerate((
-            (0.08, 0.18, 150, "#3B1727"), (0.74, 0.12, 210, "#2E1421"),
-            (0.54, 0.70, 170, "#3A1828"), (0.16, 0.76, 220, "#2B1320"),
-            (0.88, 0.56, 130, "#3A1726"),
-        )):
-            left, top = int(width * rx), int(height * ry)
-            item = self.create_rectangle(left, top, left + size, top + size,
-                                         outline=color, width=1)
-            self._blocks.append((item, left, top, size))
-        self.tag_lower("all")
-
-    def _animate(self) -> None:
-        if not self.winfo_exists():
-            self._job = None
-            return
-        try:
-            width, height = max(1, self.winfo_width()), max(1, self.winfo_height())
-            self._phase = (self._phase + 0.012) % 1.0
-            scan_x = int(((self._phase * 1.35) - 0.18) * width)
-            self.create_line(scan_x, 0, scan_x + 180, height, fill="#351522", width=1, tags="scan")
-            old_scan = self.find_withtag("scan")[:-1]
-            for item in old_scan:
-                self.delete(item)
-            for index, (item, left, top, size) in enumerate(self._blocks):
-                drift = int(4 * math.sin(self._phase * math.tau + index * 1.4))
-                self.coords(item, left, top + drift, left + size, top + size + drift)
-            self._job = self.after(55, self._animate)
-        except tk.TclError:
-            self._job = None
-
-    def stop(self) -> None:
-        if self._job:
-            try:
-                self.after_cancel(self._job)
-            except tk.TclError:
-                pass
-            self._job = None
 
 UI_TEXT = {
     "en": {
@@ -925,23 +863,10 @@ class QuestCompleterApp:
             except tk.TclError:
                 pass
             self.splash_job = None
-        backdrop = getattr(self, "backdrop", None)
-        if backdrop and backdrop.winfo_exists():
-            backdrop.stop()
         for widget in self.root.winfo_children():
             widget.destroy()
-        self.backdrop = None
-
-    def _ensure_backdrop(self) -> None:
-        """Keep one decorative layer per page; never stack animation jobs during navigation."""
-        if getattr(self, "backdrop", None) and self.backdrop.winfo_exists():
-            return
-        self.backdrop = AnimatedBackdrop(self.root)
-        self.backdrop.place(relx=0, rely=0, relwidth=1, relheight=1)
-        self.backdrop.lower()
 
     def _auth_header(self, subtitle: str) -> None:
-        self._ensure_backdrop()
         header = tk.Frame(self.root, bg=BG)
         header.pack(fill="x", padx=30, pady=(22, 15))
         logo_slot = tk.Frame(header, width=46, height=46, bg=BG)
@@ -1020,7 +945,6 @@ class QuestCompleterApp:
 
     def build_splash_screen(self) -> None:
         self._clear_root()
-        self._ensure_backdrop()
         self.auth_screen = "splash"
         self.splash_angle = 0
         self.splash_panel = tk.Frame(self.root, bg=BG)
@@ -1420,7 +1344,6 @@ class QuestCompleterApp:
         return RoundedSurface(parent, fill=PANEL, radius=20, width=width, height=height, background=BG)
 
     def build_ui(self) -> None:
-        self._ensure_backdrop()
         header = tk.Frame(self.root, bg=BG)
         header.pack(fill="x", padx=30, pady=(22, 15))
         self.build_account_widget(header)
@@ -2479,5 +2402,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
 
