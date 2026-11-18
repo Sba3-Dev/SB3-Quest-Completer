@@ -6,10 +6,12 @@ in Python and exposes only allow-listed UI operations to JavaScript.
 from __future__ import annotations
 
 import os
+import hashlib
 import shutil
 import subprocess
 import sys
 import threading
+import tempfile
 import time
 import webbrowser
 from pathlib import Path
@@ -166,9 +168,69 @@ class WebRuntime:
         self._evaluate("window.sb3Web.showScreen('login')")
 
     def install_update(self) -> None:
-        # The current release page remains the safe update entry point until the
-        # HTML download-progress adapter is added; this keeps the action usable.
-        webbrowser.open_new_tab("https://github.com/Sba3-Dev/SB3-Quest-Completer/releases/latest")
+        with self.lock:
+            manifest = dict(self.health_state.get("manifest") or {})
+        if not manifest:
+            self._notify("Update information is not ready yet")
+            return
+        threading.Thread(target=self._download_update_worker, args=(manifest,),
+                         daemon=True, name="sb3-web-update-download").start()
+
+    def _update_ui(self, message: str, ratio: float | None = None) -> None:
+        payload = self._json(str(message))
+        progress = ""
+        if ratio is not None:
+            progress = f";document.getElementById('update-progress-fill').style.width='{max(0,min(100,ratio*100)):.1f}%'"
+        self._evaluate(f"document.getElementById('update-status').textContent={payload}{progress}")
+
+    def _download_update_worker(self, manifest: dict[str, Any]) -> None:
+        temp_path: Path | None = None
+        try:
+            if os.name != "nt":
+                raise RuntimeError("Windows installer can only run on Windows")
+            package_url = str(manifest.get("package_url") or "").strip()
+            latest = str(manifest.get("version") or "latest").strip()
+            if not package_url:
+                raise ValueError("update package URL is missing")
+            self._evaluate("document.getElementById('update-button').disabled=true")
+            self._update_ui("Downloading update…", 0.0)
+            download = requests.get(package_url, timeout=(10, 120), stream=True)
+            download.raise_for_status()
+            total = int(download.headers.get("content-length") or manifest.get("package_size") or 0)
+            received = 0
+            temp_path = Path(tempfile.gettempdir()) / f"SB3QuestCompleter-update-{latest}.zip"
+            with temp_path.open("wb") as target:
+                for chunk in download.iter_content(chunk_size=1024 * 1024):
+                    if not chunk:
+                        continue
+                    target.write(chunk)
+                    received += len(chunk)
+                    self._update_ui(f"Downloading update… {int(received / total * 100) if total else 0}%",
+                                    received / total if total else None)
+            expected_hash = str(manifest.get("package_sha256") or manifest.get("sha256") or "").strip().casefold()
+            if expected_hash:
+                digest = hashlib.sha256(temp_path.read_bytes()).hexdigest().casefold()
+                if digest != expected_hash:
+                    raise ValueError("update checksum mismatch")
+            install_dir = Path(sys.executable).resolve().parent
+            app_path = Path(sys.executable).resolve()
+            updater_path = install_dir / "SB3Updater.exe"
+            if not updater_path.exists():
+                updater_path = self.mina.resource_path("SB3Updater.exe")
+            if not updater_path.exists():
+                raise FileNotFoundError("SB3Updater.exe is missing")
+            self._update_ui("Installing update…", 1.0)
+            subprocess.Popen([str(updater_path), str(temp_path), str(install_dir),
+                              str(os.getpid()), str(app_path)], close_fds=True)
+            threading.Timer(0.2, lambda: os._exit(0)).start()
+        except Exception as exc:
+            if temp_path:
+                try:
+                    temp_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            self._evaluate("document.getElementById('update-button').disabled=false")
+            self._update_ui(f"Update failed: {exc}")
 
     def _load_library(self) -> None:
         try:
