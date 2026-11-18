@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.5.8"
+VERSION = "0.5.9"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -104,7 +104,7 @@ UI_TEXT = {
         "already_queue": "● Game is already in the queue", "added": "● Added: {name}",
         "stopped_tasks": "● Stopped {count} active task(s)",
         "support_title": "Sba3 Dev Support", "support_message": "Join our Discord server for support and updates.",
-        "brand_year": "Sba3 Dev - 2026", "current_tool_version": "(v{version})",
+        "brand_year": "Sba3 Dev - 2026", "current_tool_version": "v{version}",
         "join_support": "Join Discord server", "logout": "Sign out",
         "auth_subtitle": "Discord access required", "login_title": "Sign in with Discord",
         "login_message": "Sign in with your Discord account to continue.", "login_button": "Sign in with Discord",
@@ -140,7 +140,7 @@ UI_TEXT = {
         "already_queue": "● اللعبة موجودة في قائمة المهام", "added": "● تمت الإضافة: {name}",
         "stopped_tasks": "● تم إيقاف {count} من المهام النشطة",
         "support_title": "دعم Sba3 Dev", "support_message": "انضم إلى سيرفر Discord للدعم والحصول على آخر التحديثات.",
-        "brand_year": "Sba3 Dev - 2026", "current_tool_version": "(v{version})",
+        "brand_year": "Sba3 Dev - 2026", "current_tool_version": "v{version}",
         "join_support": "انضم إلى سيرفر Discord", "logout": "تسجيل الخروج",
         "auth_subtitle": "تسجيل الدخول عبر Discord", "login_title": "تسجيل الدخول عبر Discord",
         "login_message": "سجّل دخولك بحساب Discord للمتابعة إلى الأداة.", "login_button": "تسجيل الدخول عبر Discord",
@@ -1491,10 +1491,14 @@ class QuestCompleterApp:
             popup_avatar.itemconfigure(self.account_popup_image_item, image=self.account_avatar_thumb_image, state="normal")
             popup_avatar.itemconfigure(self.account_popup_fallback, state="hidden")
         username = str(user_info.get("global_name") or user_info.get("username") or "Discord user")
+        discord_username = str(user_info.get("username") or "").strip()
         identity = tk.Frame(top, bg=PANEL)
         identity.pack(side="left", fill="both", expand=True, padx=(9, 0))
         tk.Label(identity, text=username, bg=PANEL, fg=TEXT, font=("Segoe UI", 9, "bold"),
                  anchor="w").pack(fill="x")
+        if discord_username and discord_username != username:
+            tk.Label(identity, text=f"@{discord_username}", bg=PANEL, fg=MUTED,
+                     font=("Segoe UI", 7), anchor="w").pack(fill="x")
         for label, command in ((self.tr("settings"), self.open_settings_panel),
                                (self.tr("support"), self.open_support_panel),
                                (self.tr("logout"), self.logout)):
@@ -1677,8 +1681,6 @@ class QuestCompleterApp:
                                           background=PANEL)
         self.queue_count = tk.Label(top, text=f"0 {self.tr('selected')}", bg=PANEL, fg=MUTED, font=("Segoe UI", 9, "bold"))
         self.queue_count.pack(side="right")
-        tk.Label(self.queue_panel, text=self.tr("queue_help"), bg=PANEL, fg=TEXT_DIM,
-                 font=("Segoe UI", 9), justify="left", wraplength=265).pack(anchor="w", padx=22, pady=(0, 14))
         queue_outer = tk.Frame(self.queue_panel, bg=PANEL)
         queue_outer.pack(fill="both", expand=True, padx=17, pady=(0, 17))
         self.queue_canvas = tk.Canvas(queue_outer, bg=PANEL, highlightthickness=0, bd=0)
