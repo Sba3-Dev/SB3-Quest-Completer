@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.5.9"
+VERSION = "0.6.0"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -106,13 +106,13 @@ UI_TEXT = {
         "support_title": "Sba3 Dev Support", "support_message": "Join our Discord server for support and updates.",
         "brand_year": "Sba3 Dev - 2026", "current_tool_version": "v{version}",
         "join_support": "Join Discord server", "logout": "Sign out",
-        "auth_subtitle": "Discord access required", "login_title": "Sign in with Discord",
+        "auth_subtitle": "", "login_title": "Sign in with Discord",
         "login_message": "Sign in with your Discord account to continue.", "login_button": "Sign in with Discord",
         "checking_session": "Checking saved Discord session...", "checking_updates": "Checking for updates...",
-        "membership_subtitle": "Discord server access", "membership_title": "To use the app, join the SB3 server",
+        "membership_subtitle": "", "membership_title": "To use the app, join the SB3 server",
         "membership_message": "Click the button, join the server, then return to the app.",
         "membership_error": "There was an error joining. Please try again.", "join_button": "Join the server", "refresh_membership": "Refresh",
-        "update_subtitle": "Application update", "update_title": "A new update is available",
+        "update_subtitle": "", "update_title": "A new update is available",
         "current_version": "Current version: {version}", "new_version": "New version: {version}",
         "update_button": "Update now", "downloading_update": "Downloading update...",
         "cancel_update": "Cancel", "update_cancelled": "Update cancelled.",
@@ -142,13 +142,13 @@ UI_TEXT = {
         "support_title": "دعم Sba3 Dev", "support_message": "انضم إلى سيرفر Discord للدعم والحصول على آخر التحديثات.",
         "brand_year": "Sba3 Dev - 2026", "current_tool_version": "v{version}",
         "join_support": "انضم إلى سيرفر Discord", "logout": "تسجيل الخروج",
-        "auth_subtitle": "تسجيل الدخول عبر Discord", "login_title": "تسجيل الدخول عبر Discord",
+        "auth_subtitle": "", "login_title": "تسجيل الدخول عبر Discord",
         "login_message": "سجّل دخولك بحساب Discord للمتابعة إلى الأداة.", "login_button": "تسجيل الدخول عبر Discord",
         "checking_session": "جارٍ فحص جلسة Discord المحفوظة...", "checking_updates": "جارٍ فحص التحديثات...",
-        "membership_subtitle": "الوصول إلى سيرفر Discord", "membership_title": "لاستخدام الأداة يجب عليك الانضمام إلى سيرفر SB3",
+        "membership_subtitle": "", "membership_title": "لاستخدام الأداة يجب عليك الانضمام إلى سيرفر SB3",
         "membership_message": "اضغط الزر، انضم إلى السيرفر، ثم ارجع إلى الأداة.",
         "membership_error": "حدث خطأ في الانضمام، يرجى المحاولة مرة أخرى.", "join_button": "انضمام إلى السيرفر", "refresh_membership": "تحديث",
-        "update_subtitle": "تحديث التطبيق", "update_title": "يتوفر تحديث جديد",
+        "update_subtitle": "", "update_title": "يتوفر تحديث جديد",
         "current_version": "النسخة الحالية: {version}", "new_version": "النسخة الجديدة: {version}",
         "update_button": "تحديث الآن", "downloading_update": "جارٍ تنزيل التحديث...",
         "cancel_update": "إلغاء", "update_cancelled": "تم إلغاء التحديث.",
@@ -882,8 +882,9 @@ class QuestCompleterApp:
                  font=("Segoe UI", 9)).pack(anchor="w")
         tk.Label(labels, text=self.tr("current_tool_version", version=VERSION), bg=BG, fg=MUTED,
                  font=("Segoe UI", 8)).pack(anchor="w")
-        tk.Label(labels, text=subtitle, bg=BG, fg=TEXT_DIM,
-                 font=("Segoe UI", 9)).pack(anchor="w", pady=(2, 0))
+        if subtitle:
+            tk.Label(labels, text=subtitle, bg=BG, fg=TEXT_DIM,
+                     font=("Segoe UI", 9)).pack(anchor="w", pady=(2, 0))
 
     def _auth_footer(self) -> None:
         footer = tk.Frame(self.root, bg=BG)
