@@ -46,7 +46,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.7.3"
+VERSION = "0.7.4"
 _SINGLE_INSTANCE_HANDLE = None
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json

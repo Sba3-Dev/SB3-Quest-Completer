@@ -49,6 +49,7 @@ jobs:
           python -m PyInstaller --noconfirm --clean --onefile --windowed
           --name SB3QuestCompleter --icon "%CD%\logo.ico"
           --add-data "%CD%\logo.ico;."
+          --add-data "%CD%\webui;webui"
           --distpath dist --workpath build --specpath build mina.py
 
       - name: Build silent updater
