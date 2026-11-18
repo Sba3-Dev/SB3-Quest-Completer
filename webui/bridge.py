@@ -20,6 +20,7 @@ class WebUiBridge:
                  on_membership: Callable[[], None] | None = None,
                  on_logout: Callable[[], None] | None = None,
                  on_update: Callable[[], None] | None = None,
+                 on_cancel_update: Callable[[], None] | None = None,
                  on_add: Callable[[str], None] | None = None,
                  on_remove: Callable[[str], None] | None = None,
                  on_run: Callable[[str], None] | None = None,
@@ -30,6 +31,7 @@ class WebUiBridge:
         self._on_health = on_health
         self._on_login, self._on_support = on_login, on_support
         self._on_membership, self._on_logout, self._on_update = on_membership, on_logout, on_update
+        self._on_cancel_update = on_cancel_update
         self._on_add, self._on_remove = on_add, on_remove
         self._on_run, self._on_stop, self._on_stop_all = on_run, on_stop, on_stop_all
 
@@ -41,9 +43,9 @@ class WebUiBridge:
         if self._on_refresh:
             self._on_refresh()
 
-    def health_check(self) -> dict[str, Any]:
+    def health_check(self, full_check: bool = True) -> dict[str, Any]:
         if self._on_health:
-            value = self._on_health()
+            value = self._on_health(full_check)
             return value if isinstance(value, dict) else {}
         return {}
 
@@ -66,6 +68,10 @@ class WebUiBridge:
     def install_update(self) -> None:
         if self._on_update:
             self._on_update()
+
+    def cancel_update(self) -> None:
+        if self._on_cancel_update:
+            self._on_cancel_update()
 
     def add_to_queue(self, game_id: str) -> None:
         if self._on_add and isinstance(game_id, str) and game_id.strip():

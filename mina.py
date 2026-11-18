@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.7.3"
+VERSION = "0.7.4"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -373,7 +373,7 @@ class SoftScrollbar(tk.Canvas):
 
 
 DISCORD_DETECTABLE_URL = "https://discord.com/api/v10/applications/detectable"
-DISCORD_ICON_URL = "https://cdn.discordapp.com/app-icons/{app_id}/{icon_hash}.png?size=64"
+DISCORD_ICON_URL = "https://cdn.discordapp.com/app-icons/{app_id}/{icon_hash}.png?size=128"
 HEADERS = {"User-Agent": "SB3QuestCompleter/1.1", "Accept": "application/json"}
 DISCORD_CLIENT_ID = os.getenv("SB3_DISCORD_CLIENT_ID", "1541619305592922162")
 SUPPORT_DISCORD_URL = "https://discord.gg/WcknYK29Hq"

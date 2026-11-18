@@ -54,6 +54,8 @@ class WebRuntime:
         self.health_state: dict[str, Any] = {"status": "splash", "version": self.mina.VERSION}
         self.health_checked_at = 0.0
         self.health_busy = False
+        self.update_cancel_event = threading.Event()
+        self.update_busy = False
 
     def bootstrap(self) -> dict[str, Any]:
         session = self.mina.load_discord_session()
@@ -78,8 +80,10 @@ class WebRuntime:
             return
         threading.Thread(target=self._load_library, daemon=True, name="sb3-web-library").start()
 
-    def health_check(self) -> dict[str, Any]:
+    def health_check(self, full_check: bool = True) -> dict[str, Any]:
         """Return cached state every second; refresh network state at most every 15s."""
+        if not full_check:
+            return self._update_only_check()
         with self.lock:
             if self.queue or self.active:
                 return {"status": "hold", "reason": "tasks_active"}
@@ -119,6 +123,37 @@ class WebRuntime:
             with self.lock:
                 self.health_state = state
             return dict(state)
+        finally:
+            with self.lock:
+                self.health_busy = False
+
+    def _update_only_check(self) -> dict[str, Any]:
+        """Check only the manifest; never re-check login or server membership."""
+        with self.lock:
+            now = time.monotonic()
+            if self.health_busy or now - self.health_checked_at < 15:
+                return dict(self.health_state)
+            self.health_busy = True
+            self.health_checked_at = now
+            previous = dict(self.health_state)
+        try:
+            if requests:
+                try:
+                    response = requests.get(self.mina.UPDATE_MANIFEST_URL,
+                                            headers=self.mina.HEADERS, timeout=(3, 8))
+                    response.raise_for_status()
+                    manifest = response.json()
+                    latest = str(manifest.get("version") or "").strip()
+                    installer = str(manifest.get("installer_url") or "").strip()
+                    if latest and installer and _version_tuple(latest) > _version_tuple(self.mina.VERSION):
+                        state = {"status": "update", "version": self.mina.VERSION,
+                                 "latest": latest, "manifest": manifest}
+                        with self.lock:
+                            self.health_state = state
+                        return dict(state)
+                except Exception:
+                    pass
+            return previous
         finally:
             with self.lock:
                 self.health_busy = False
@@ -169,12 +204,26 @@ class WebRuntime:
 
     def install_update(self) -> None:
         with self.lock:
+            if self.update_busy:
+                return
+            self.update_busy = True
+        self.update_cancel_event.clear()
+        with self.lock:
             manifest = dict(self.health_state.get("manifest") or {})
         if not manifest:
+            with self.lock:
+                self.update_busy = False
             self._notify("Update information is not ready yet")
             return
+        self._evaluate("document.getElementById('update-button').hidden=true;document.getElementById('cancel-update').hidden=false")
         threading.Thread(target=self._download_update_worker, args=(manifest,),
                          daemon=True, name="sb3-web-update-download").start()
+
+    def cancel_update(self) -> None:
+        with self.lock:
+            if self.update_busy:
+                self.update_cancel_event.set()
+        self._update_ui("Cancelling update…")
 
     def _update_ui(self, message: str, ratio: float | None = None) -> None:
         payload = self._json(str(message))
@@ -203,6 +252,11 @@ class WebRuntime:
                 for chunk in download.iter_content(chunk_size=1024 * 1024):
                     if not chunk:
                         continue
+                    if self.update_cancel_event.is_set():
+                        temp_path.unlink(missing_ok=True)
+                        self._evaluate("document.getElementById('update-button').hidden=false;document.getElementById('cancel-update').hidden=true;document.getElementById('update-progress-fill').style.width='0%'")
+                        self._update_ui("Update cancelled")
+                        return
                     target.write(chunk)
                     received += len(chunk)
                     self._update_ui(f"Downloading update… {int(received / total * 100) if total else 0}%",
@@ -229,8 +283,11 @@ class WebRuntime:
                     temp_path.unlink(missing_ok=True)
                 except OSError:
                     pass
-            self._evaluate("document.getElementById('update-button').disabled=false")
+            self._evaluate("document.getElementById('update-button').hidden=false;document.getElementById('cancel-update').hidden=true")
             self._update_ui(f"Update failed: {exc}")
+        finally:
+            with self.lock:
+                self.update_busy = False
 
     def _load_library(self) -> None:
         try:
@@ -399,11 +456,15 @@ class WebRuntime:
 
     def _public_games(self) -> list[dict[str, Any]]:
         with self.lock:
-            return [{"id": g.get("id"), "name": g.get("_public_name") or g.get("name"),
-                     "platform": (g.get("_platforms") or [None])[0],
-                     "icon": (self.mina.DISCORD_ICON_URL.format(app_id=g.get("id"),
-                                                                 icon_hash=g.get("icon_hash") or g.get("icon"))
-                              if (g.get("icon_hash") or g.get("icon")) else "")} for g in self.games]
+            result = []
+            for g in self.games:
+                icon_hash = g.get("icon_hash") or g.get("icon")
+                icon = (self.mina.DISCORD_ICON_URL.format(app_id=g.get("id"), icon_hash=icon_hash)
+                        if icon_hash else str(g.get("icon_url") or ""))
+                result.append({"id": g.get("id"), "name": g.get("_public_name") or g.get("name"),
+                               "platform": (g.get("_platforms") or [None])[0],
+                               "icon": icon, "has_icon": bool(icon)})
+            return result
 
     def _public_queue(self) -> list[dict[str, Any]]:
         with self.lock:
@@ -442,12 +503,13 @@ def launch_web_ui() -> bool:
     bridge = WebUiBridge(
         state_provider=lambda: runtime_holder["runtime"].bootstrap() if "runtime" in runtime_holder else {},
         on_refresh=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_library(),
-        on_health=lambda: runtime_holder["runtime"].health_check() if "runtime" in runtime_holder else {},
+        on_health=lambda full_check=True: runtime_holder["runtime"].health_check(full_check) if "runtime" in runtime_holder else {},
         on_login=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_login(),
         on_support=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_support(),
         on_membership=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_membership(),
         on_logout=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].logout(),
         on_update=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].install_update(),
+        on_cancel_update=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].cancel_update(),
         on_add=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].add_to_queue(game_id),
         on_remove=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].remove_from_queue(game_id),
         on_run=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].run_quest(game_id),
