@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.5.7"
+VERSION = "0.5.8"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -878,7 +878,12 @@ class QuestCompleterApp:
         labels = tk.Frame(header, bg=BG)
         labels.pack(side="left", fill="x", expand=True)
         tk.Label(labels, text=APP_NAME, bg=BG, fg=TEXT, font=("Segoe UI", 19, "bold")).pack(anchor="w")
-        tk.Label(labels, text=subtitle, bg=BG, fg=TEXT_DIM, font=("Segoe UI", 9)).pack(anchor="w", pady=(3, 0))
+        tk.Label(labels, text="Sba3 Dev - 2026", bg=BG, fg=TEXT_DIM,
+                 font=("Segoe UI", 9)).pack(anchor="w")
+        tk.Label(labels, text=self.tr("current_tool_version", version=VERSION), bg=BG, fg=MUTED,
+                 font=("Segoe UI", 8)).pack(anchor="w")
+        tk.Label(labels, text=subtitle, bg=BG, fg=TEXT_DIM,
+                 font=("Segoe UI", 9)).pack(anchor="w", pady=(2, 0))
 
     def _auth_footer(self) -> None:
         footer = tk.Frame(self.root, bg=BG)
@@ -1351,7 +1356,10 @@ class QuestCompleterApp:
         labels = tk.Frame(header, bg=BG)
         labels.pack(side="left", fill="x", expand=True)
         tk.Label(labels, text=APP_NAME, bg=BG, fg=TEXT, font=("Segoe UI", 19, "bold")).pack(anchor="w")
-        tk.Label(labels, text="Sba3 Dev - 2026", bg=BG, fg=TEXT_DIM, font=("Segoe UI", 9)).pack(anchor="w", pady=(3, 0))
+        tk.Label(labels, text="Sba3 Dev - 2026", bg=BG, fg=TEXT_DIM,
+                 font=("Segoe UI", 9)).pack(anchor="w")
+        tk.Label(labels, text=self.tr("current_tool_version", version=VERSION), bg=BG, fg=MUTED,
+                 font=("Segoe UI", 8)).pack(anchor="w")
         body = tk.Frame(self.root, bg=BG)
         body.pack(fill="both", expand=True, padx=28, pady=(0, 14))
         body.grid_columnconfigure(0, weight=3, minsize=570)
@@ -1455,14 +1463,14 @@ class QuestCompleterApp:
         menu = tk.Frame(self.root, bg=BG, highlightthickness=0, bd=0)
         x = max(8, self.account_avatar.winfo_rootx() - self.root.winfo_rootx() - 228)
         y = max(8, self.account_avatar.winfo_rooty() - self.root.winfo_rooty())
-        menu.place(x=x, y=y, width=220, height=220)
+        menu.place(x=x, y=y, width=220, height=205)
         menu.lift()
         self.account_menu = menu
-        surface = RoundedSurface(menu, fill=PANEL, radius=16, width=220, height=220, background=PANEL)
+        surface = RoundedSurface(menu, fill=PANEL, radius=16, width=220, height=205, background=PANEL)
         surface.pack(fill="both", expand=True)
         content = surface.content
         user_info = load_discord_session().get("user") or {}
-        top = tk.Frame(content, bg=PANEL, height=48)
+        top = tk.Frame(content, bg=PANEL, height=40)
         top.pack(fill="x", padx=12, pady=(12, 8))
         top.pack_propagate(False)
         close_button = tk.Button(top, text="×", command=self._close_account_menu,
@@ -1487,10 +1495,6 @@ class QuestCompleterApp:
         identity.pack(side="left", fill="both", expand=True, padx=(9, 0))
         tk.Label(identity, text=username, bg=PANEL, fg=TEXT, font=("Segoe UI", 9, "bold"),
                  anchor="w").pack(fill="x")
-        tk.Label(identity, text=self.tr("brand_year"), bg=PANEL, fg=TEXT_DIM,
-                 font=("Segoe UI", 8), anchor="w").pack(fill="x")
-        tk.Label(identity, text=self.tr("current_tool_version", version=VERSION), bg=PANEL, fg=MUTED,
-                 font=("Segoe UI", 7), anchor="w").pack(fill="x")
         for label, command in ((self.tr("settings"), self.open_settings_panel),
                                (self.tr("support"), self.open_support_panel),
                                (self.tr("logout"), self.logout)):
