@@ -45,12 +45,13 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.6.2"
+VERSION = "0.6.3"
+_SINGLE_INSTANCE_HANDLE = None
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
     "SB3_UPDATE_MANIFEST_URL",
-    "https://raw.githubusercontent.com/awas123456awas-png/-SB3-Quest-Completer/main/update.json",
+    "https://raw.githubusercontent.com/Sba3-Dev/SB3-Quest-Completer/main/update.json",
 )
 # Burgundy Minimal: هرم لوني هادئ وواضح، من دون تباين قاسٍ أو تأثيرات مشتّتة.
 # الخلفية الداكنة الموحّدة تُبقي التركيز على محتوى المكتبة والقوائم.
@@ -63,8 +64,8 @@ BORDER = "#3B2026"          # فواصل وحدود خافتة
 TEXT = "#F7EFF0"            # نص رئيسي ناعم وعالي الوضوح
 TEXT_DIM = "#CCB8BC"        # نص ثانوي
 MUTED = "#967B81"           # نص مساعد وخافت
-RED = "#A7474D"             # لون الإجراء الرئيسي
-RED_HOVER = "#B9585E"       # تفاعل هادئ عند المرور
+RED = "#B73549"             # لون قرمزي فخم للإجراء الرئيسي
+RED_HOVER = "#CC4659"       # تفاعل هادئ عند المرور
 RED_DARK = "#3D161C"        # زر الإيقاف — أحمر داكن واضح
 RED_DARK_HOVER = "#552128"  # تفاعل زر الإيقاف
 SUCCESS = "#83A38B"         # حالة النجاح
@@ -73,7 +74,7 @@ SUCCESS = "#83A38B"         # حالة النجاح
 BURGUNDY_PALETTE = {
     "BG": "#0E080A", "PANEL": "#1B0C10", "CARD": "#251217", "CARD_HOVER": "#321A20",
     "INPUT": "#160A0D", "BORDER": "#3B2026", "TEXT": "#F7EFF0", "TEXT_DIM": "#CCB8BC",
-    "MUTED": "#967B81", "RED": "#A7474D", "RED_HOVER": "#B9585E",
+    "MUTED": "#967B81", "RED": "#B73549", "RED_HOVER": "#CC4659",
     "RED_DARK": "#3D161C", "RED_DARK_HOVER": "#552128", "SUCCESS": "#83A38B",
 }
 HIGH_CONTRAST_PALETTE = {
@@ -866,6 +867,7 @@ class QuestCompleterApp:
             widget.destroy()
 
     def _auth_header(self, subtitle: str) -> None:
+        self._add_grid_background()
         header = tk.Frame(self.root, bg=BG)
         header.pack(fill="x", padx=30, pady=(22, 15))
         logo_slot = tk.Frame(header, width=46, height=46, bg=BG)
@@ -1342,7 +1344,19 @@ class QuestCompleterApp:
         # حواف أكثر هدوءًا وبساطة للوحتي المكتبة وقائمة المهام.
         return RoundedSurface(parent, fill=PANEL, radius=20, width=width, height=height, background=BG)
 
+    def _add_grid_background(self) -> None:
+        """Add a restrained low-contrast grid behind the current page."""
+        canvas = tk.Canvas(self.root, bg=BG, highlightthickness=0, bd=0)
+        canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
+        for position in range(0, 1400, 40):
+            canvas.create_line(position, 0, position, 1000, fill=BORDER, width=1)
+        for position in range(0, 1000, 40):
+            canvas.create_line(0, position, 1400, position, fill=BORDER, width=1)
+        canvas.lower()
+        self.grid_background = canvas
+
     def build_ui(self) -> None:
+        self._add_grid_background()
         header = tk.Frame(self.root, bg=BG)
         header.pack(fill="x", padx=30, pady=(22, 15))
         self.build_account_widget(header)
@@ -2358,6 +2372,34 @@ class QuestCompleterApp:
         except AttributeError: pass
 
 
+def ensure_single_instance() -> bool:
+    """Allow one GUI process and focus it when the shortcut is launched again."""
+    global _SINGLE_INSTANCE_HANDLE
+    if os.name != "nt":
+        return True
+    import ctypes
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    handle = kernel32.CreateMutexW(None, True, "Local\\SB3QuestCompleter.SingleInstance")
+    if not handle:
+        return True
+    if kernel32.GetLastError() == 183:
+        user32.FindWindowW.restype = ctypes.c_void_p
+        window = None
+        for _ in range(10):
+            window = user32.FindWindowW(None, APP_NAME)
+            if window:
+                break
+            time.sleep(0.1)
+        if window:
+            user32.ShowWindow(window, 9)
+            user32.SetForegroundWindow(window)
+        kernel32.CloseHandle(handle)
+        return False
+    _SINGLE_INSTANCE_HANDLE = handle
+    return True
+
+
 def main() -> None:
     if "--run-game" in sys.argv:
         index = sys.argv.index("--run-game")
@@ -2365,6 +2407,8 @@ def main() -> None:
         run_game_process(sys.argv[index + 1], sys.argv[index + 2], stop_signal)
         return
 
+    if not ensure_single_instance():
+        return
     root = tk.Tk()
     QuestCompleterApp(root)
     root.mainloop()
