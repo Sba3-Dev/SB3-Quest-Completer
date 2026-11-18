@@ -13,18 +13,24 @@ class WebUiBridge:
     """Expose only presentation-safe callbacks to JavaScript."""
 
     def __init__(self, *, state_provider: Callable[[], dict[str, Any]] | None = None,
+                 on_refresh: Callable[[], None] | None = None,
                  on_add: Callable[[str], None] | None = None,
                  on_remove: Callable[[str], None] | None = None,
                  on_run: Callable[[str], None] | None = None,
                  on_stop: Callable[[str], None] | None = None,
                  on_stop_all: Callable[[], None] | None = None) -> None:
         self._state_provider = state_provider or (lambda: {})
+        self._on_refresh = on_refresh
         self._on_add, self._on_remove = on_add, on_remove
         self._on_run, self._on_stop, self._on_stop_all = on_run, on_stop, on_stop_all
 
     def bootstrap(self) -> dict[str, Any]:
         value = self._state_provider()
         return value if isinstance(value, dict) else {}
+
+    def refresh_library(self) -> None:
+        if self._on_refresh:
+            self._on_refresh()
 
     def add_to_queue(self, game_id: str) -> None:
         if self._on_add and isinstance(game_id, str) and game_id.strip():

@@ -2365,6 +2365,17 @@ def main() -> None:
         run_game_process(sys.argv[index + 1], sys.argv[index + 2], stop_signal)
         return
 
+    # The HTML frontend is opt-in until it has been verified on the target
+    # Windows WebView2 runtime. Any import, session, or window failure falls
+    # through to the unchanged Tk frontend instead of making the app unusable.
+    if os.getenv("SB3_WEB_UI", "0") == "1":
+        try:
+            from webui.runtime import launch_web_ui
+            if launch_web_ui():
+                return
+        except Exception:
+            pass
+
     root = tk.Tk()
     QuestCompleterApp(root)
     root.mainloop()

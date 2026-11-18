@@ -1,0 +1,249 @@
+"""Optional pywebview runtime for the HTML dashboard.
+
+The legacy Tk frontend remains the fallback. This adapter keeps all system work
+in Python and exposes only allow-listed UI operations to JavaScript.
+"""
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+from typing import Any
+
+try:
+    import requests
+except ImportError:
+    requests = None
+try:
+    import webview
+except ImportError:
+    webview = None
+
+from .bridge import WebUiBridge
+
+
+def _module():
+    import mina
+    return mina
+
+
+class WebRuntime:
+    def __init__(self, window: Any) -> None:
+        self.window = window
+        self.mina = _module()
+        self.games: list[dict[str, Any]] = []
+        self.queue: list[dict[str, Any]] = []
+        self.active: dict[str, dict[str, Any]] = {}
+        self.lock = threading.RLock()
+        self.closed = False
+
+    def bootstrap(self) -> dict[str, Any]:
+        session = self.mina.load_discord_session()
+        return {
+            "version": self.mina.VERSION,
+            "user": session.get("user") or {},
+            "games": self._public_games(),
+            "queue": self._public_queue(),
+        }
+
+    def refresh_library(self) -> None:
+        if not requests:
+            self._notify("Requests is not installed")
+            return
+        threading.Thread(target=self._load_library, daemon=True, name="sb3-web-library").start()
+
+    def _load_library(self) -> None:
+        try:
+            response = requests.get(self.mina.DISCORD_DETECTABLE_URL,
+                                    headers=self.mina.HEADERS, timeout=(5, 30))
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, dict):
+                data = data.get("applications") or data.get("games") or data.get("data") or []
+            games = []
+            for raw in data if isinstance(data, list) else []:
+                if not isinstance(raw, dict) or not raw.get("id") or not raw.get("name"):
+                    continue
+                item = dict(raw)
+                item["_public_name"] = self.mina.display_name(item["name"])
+                item["_exe"] = self.mina.win_executable(item)
+                item["_platforms"] = self.mina.platforms_for_game(item)
+                item["_featured_rank"] = self.mina.newest_game_rank(item["id"])
+                games.append(item)
+            games.sort(key=lambda item: (item["_featured_rank"], item["_public_name"].casefold()))
+            with self.lock:
+                self.games = games
+            self._evaluate("window.sb3Web.setGames(%s)" % self._json(self._public_games()))
+            self._notify("Discord library ready")
+        except Exception as exc:
+            self._notify(f"Library unavailable: {exc}")
+
+    def add_to_queue(self, game_id: str) -> None:
+        with self.lock:
+            game = next((g for g in self.games if str(g.get("id")) == game_id), None)
+            if not game or any(str(g.get("id")) == game_id for g in self.queue):
+                return
+            item = dict(game)
+            item["exe"] = {"name": item.get("_exe") or ""}
+            self.queue.append(item)
+        self._sync_queue()
+
+    def remove_from_queue(self, game_id: str) -> None:
+        self.stop_quest(game_id)
+        with self.lock:
+            self.queue = [g for g in self.queue if str(g.get("id")) != game_id]
+        self._sync_queue()
+
+    def run_quest(self, game_id: str) -> None:
+        with self.lock:
+            quest = next((g for g in self.queue if str(g.get("id")) == game_id), None)
+        if not quest or game_id in self.active:
+            return
+        platforms = self.mina.platforms_for_game(quest) or tuple(quest.get("_platforms") or ())
+        if not platforms:
+            self._notify("No verified PC launcher found")
+            return
+        try:
+            self._start_process(quest, platforms[0])
+        except Exception as exc:
+            self._notify(f"Launch failed: {exc}")
+
+    def _start_process(self, quest: dict[str, Any], platform: str) -> None:
+        qid = str(quest["id"])
+        session_id = str(int(time.time()))
+        full_path = str((quest.get("exe") or {}).get("name") or "game.exe").replace("\\", "/").lstrip("/")
+        exe_dir, exe_file = os.path.split(full_path) if "/" in full_path else ("", full_path)
+        base = Path.cwd() / "games" / qid / session_id / exe_dir
+        base.mkdir(parents=True, exist_ok=True)
+        temp_exe = base / (exe_file or "game.exe")
+        source = Path(sys.executable if getattr(sys, "frozen", False) else sys.argv[0]).resolve()
+        shutil.copy2(source, temp_exe)
+        icon = self.mina.resource_path("logo.ico")
+        if icon.exists():
+            shutil.copy2(icon, base / "logo.ico")
+        stop_signal = base / "stop.signal"
+        command = ([str(temp_exe), "--run-game", quest["name"], platform, str(stop_signal)]
+                   if getattr(sys, "frozen", False) else
+                   [sys.executable, str(temp_exe), "--run-game", quest["name"], platform, str(stop_signal)])
+        proc = subprocess.Popen(command, cwd=str(base))
+        with self.lock:
+            self.active[qid] = {"proc": proc, "stop_signal": stop_signal,
+                                 "session_path": Path.cwd() / "games" / qid,
+                                 "started_at": time.monotonic()}
+        self._sync_queue()
+        threading.Thread(target=self._watch_process, args=(qid, proc), daemon=True,
+                         name=f"sb3-web-watch-{qid}").start()
+
+    def _watch_process(self, qid: str, proc: Any) -> None:
+        proc.wait()
+        with self.lock:
+            data = self.active.pop(qid, None)
+        if data:
+            shutil.rmtree(data["session_path"], ignore_errors=True)
+        self._sync_queue()
+
+    def stop_quest(self, game_id: str) -> None:
+        with self.lock:
+            data = self.active.pop(game_id, None)
+        if not data:
+            return
+        try:
+            Path(data["stop_signal"]).touch(exist_ok=True)
+            proc = data.get("proc")
+            if proc and proc.poll() is None:
+                if os.name == "nt":
+                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                                   capture_output=True, timeout=5)
+                else:
+                    proc.kill()
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        shutil.rmtree(data["session_path"], ignore_errors=True)
+        self._sync_queue()
+
+    def stop_all(self) -> None:
+        for game_id in list(self.active):
+            self.stop_quest(str(game_id))
+
+    def close(self) -> None:
+        self.closed = True
+        self.stop_all()
+
+    def _public_games(self) -> list[dict[str, Any]]:
+        with self.lock:
+            return [{"id": g.get("id"), "name": g.get("_public_name") or g.get("name"),
+                     "platform": (g.get("_platforms") or [None])[0]} for g in self.games]
+
+    def _public_queue(self) -> list[dict[str, Any]]:
+        with self.lock:
+            return [{"id": g.get("id"), "name": g.get("_public_name") or g.get("name"),
+                     "running": str(g.get("id")) in self.active} for g in self.queue]
+
+    def _sync_queue(self) -> None:
+        self._evaluate("window.sb3Web.setQueue(%s)" % self._json(self._public_queue()))
+
+    def _notify(self, message: str) -> None:
+        self._evaluate("window.sb3Web.notify(%s)" % self._json(str(message)))
+
+    def _evaluate(self, script: str) -> None:
+        if self.closed:
+            return
+        try:
+            self.window.evaluate_js(script)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _json(value: Any) -> str:
+        import json
+        return json.dumps(value, ensure_ascii=False)
+
+
+def launch_web_ui() -> bool:
+    """Launch only when explicitly enabled and a valid saved Discord session exists."""
+    if not webview or os.getenv("SB3_WEB_UI", "0") != "1":
+        return False
+    mina = _module()
+    valid, _reason = mina.check_saved_discord_session(force_refresh=True)
+    if not valid:
+        return False
+    runtime_holder: dict[str, WebRuntime] = {}
+
+    bridge = WebUiBridge(
+        state_provider=lambda: runtime_holder["runtime"].bootstrap() if "runtime" in runtime_holder else {},
+        on_refresh=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_library(),
+        on_add=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].add_to_queue(game_id),
+        on_remove=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].remove_from_queue(game_id),
+        on_run=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].run_quest(game_id),
+        on_stop=lambda game_id: runtime_holder.get("runtime") and runtime_holder["runtime"].stop_quest(game_id),
+        on_stop_all=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].stop_all(),
+    )
+
+    def on_loaded() -> None:
+        runtime = runtime_holder.get("runtime")
+        if runtime:
+            runtime.refresh_library()
+
+    def create() -> None:
+        window = webview.create_window("SB3 Quest Completer", str(mina.resource_path("webui/index.html")),
+                                       width=1180, height=820, min_size=(980, 640),
+                                       js_api=bridge)
+        runtime = WebRuntime(window)
+        runtime_holder["runtime"] = runtime
+        window.events.loaded += on_loaded
+        window.events.closed += lambda: runtime.close()
+
+    try:
+        # A single webview event loop is used; no nested OAuth webview is created.
+        create()
+        webview.start(debug=False)
+        return True
+    except Exception:
+        runtime = runtime_holder.get("runtime")
+        if runtime:
+            runtime.close()
+        return False

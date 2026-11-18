@@ -41,5 +41,5 @@
   $('stop-all').addEventListener('click', () => { api()?.stop_all?.(); state.queue.forEach(x=>x.running=false); renderQueue(); });
   window.sb3Web = { bootstrap, setGames, setQueue: q => {state.queue=q||[];renderQueue();}, notify: toast };
   renderGames(); renderQueue();
-  window.addEventListener('pywebviewready', async () => { try { const bridge=api(); if (bridge?.bootstrap) bootstrap(await bridge.bootstrap()); } catch (e) { toast('Web interface is running in safe preview mode'); } });
+  window.addEventListener('pywebviewready', async () => { try { const bridge=api(); if (bridge?.bootstrap) bootstrap(await bridge.bootstrap()); bridge?.refresh_library?.(); } catch (e) { toast('Web interface is running in safe preview mode'); } });
 })();
