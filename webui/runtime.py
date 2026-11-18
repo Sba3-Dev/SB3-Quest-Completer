@@ -172,6 +172,8 @@ class WebRuntime:
             finally:
                 self.mina.webview = old_webview
             if valid:
+                with self.lock:
+                    self.health_state = {"status": "main", "reason": "ok", "version": self.mina.VERSION}
                 self._evaluate("window.sb3Web.showScreen('main'); window.pywebview.api.bootstrap().then(window.sb3Web.bootstrap)")
                 self.refresh_library()
             elif reason == "not_in_guild":
@@ -189,6 +191,8 @@ class WebRuntime:
             try:
                 valid, _reason = self.mina.check_saved_discord_session(force_refresh=True)
                 if valid:
+                    with self.lock:
+                        self.health_state = {"status": "main", "reason": "ok", "version": self.mina.VERSION}
                     self._evaluate("window.sb3Web.showScreen('main'); window.pywebview.api.bootstrap().then(window.sb3Web.bootstrap)")
                     self.refresh_library()
                 else:
@@ -200,6 +204,8 @@ class WebRuntime:
     def logout(self) -> None:
         self.stop_all()
         self.mina.clear_discord_session()
+        with self.lock:
+            self.health_state = {"status": "login", "reason": "missing_session", "version": self.mina.VERSION}
         self._evaluate("window.sb3Web.showScreen('login')")
 
     def install_update(self) -> None:
