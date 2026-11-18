@@ -395,7 +395,9 @@ def create_grid_backdrop(root: tk.Misc) -> tk.Canvas:
             pass
 
     canvas.bind("<Configure>", redraw)
-    canvas.pack(fill="both", expand=True)
+    # This is a true background layer. Using pack here would consume the
+    # layout space and hide the actual screen widgets on startup.
+    canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
     canvas.lower()
     return canvas
 
