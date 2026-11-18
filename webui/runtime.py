@@ -27,6 +27,14 @@ except ImportError:
 from .bridge import WebUiBridge
 
 
+def _version_tuple(value: Any) -> tuple[int, ...]:
+    parts = []
+    for part in str(value or "0").strip().lstrip("vV").split("."):
+        digits = "".join(char for char in part if char.isdigit())
+        parts.append(int(digits or 0))
+    return tuple(parts or [0])
+
+
 def _module():
     import mina
     return mina
@@ -41,6 +49,9 @@ class WebRuntime:
         self.active: dict[str, dict[str, Any]] = {}
         self.lock = threading.RLock()
         self.closed = False
+        self.health_state: dict[str, Any] = {"status": "splash", "version": self.mina.VERSION}
+        self.health_checked_at = 0.0
+        self.health_busy = False
 
     def bootstrap(self) -> dict[str, Any]:
         session = self.mina.load_discord_session()
@@ -64,6 +75,51 @@ class WebRuntime:
             self._notify("Requests is not installed")
             return
         threading.Thread(target=self._load_library, daemon=True, name="sb3-web-library").start()
+
+    def health_check(self) -> dict[str, Any]:
+        """Return cached state every second; refresh network state at most every 15s."""
+        with self.lock:
+            if self.queue or self.active:
+                return {"status": "hold", "reason": "tasks_active"}
+            now = time.monotonic()
+            if self.health_busy or now - self.health_checked_at < 15:
+                return dict(self.health_state)
+            self.health_busy = True
+            self.health_checked_at = now
+            previous = dict(self.health_state)
+        try:
+            # Check the manifest first so an outdated installation is notified
+            # before authentication or membership routing.
+            if requests:
+                try:
+                    response = requests.get(self.mina.UPDATE_MANIFEST_URL,
+                                            headers=self.mina.HEADERS, timeout=(3, 8))
+                    response.raise_for_status()
+                    manifest = response.json()
+                    latest = str(manifest.get("version") or "").strip()
+                    installer = str(manifest.get("installer_url") or "").strip()
+                    if latest and installer and _version_tuple(latest) > _version_tuple(self.mina.VERSION):
+                        state = {"status": "update", "version": self.mina.VERSION,
+                                 "latest": latest, "manifest": manifest}
+                        with self.lock:
+                            self.health_state = state
+                        return dict(state)
+                except Exception:
+                    pass
+            valid, reason = self.mina.check_saved_discord_session(force_refresh=True)
+            if not valid:
+                status = "membership" if reason == "not_in_guild" else "login"
+                if reason == "network" and previous.get("status") == "main":
+                    status = "main"
+                state = {"status": status, "reason": reason, "version": self.mina.VERSION}
+            else:
+                state = {"status": "main", "reason": "ok", "version": self.mina.VERSION}
+            with self.lock:
+                self.health_state = state
+            return dict(state)
+        finally:
+            with self.lock:
+                self.health_busy = False
 
     def open_login(self) -> None:
         threading.Thread(target=self._login_worker, daemon=True, name="sb3-web-login").start()
@@ -274,6 +330,7 @@ def launch_web_ui() -> bool:
     bridge = WebUiBridge(
         state_provider=lambda: runtime_holder["runtime"].bootstrap() if "runtime" in runtime_holder else {},
         on_refresh=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_library(),
+        on_health=lambda: runtime_holder["runtime"].health_check() if "runtime" in runtime_holder else {},
         on_login=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_login(),
         on_support=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_support(),
         on_membership=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_membership(),

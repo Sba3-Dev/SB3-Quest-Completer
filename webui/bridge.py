@@ -14,6 +14,7 @@ class WebUiBridge:
 
     def __init__(self, *, state_provider: Callable[[], dict[str, Any]] | None = None,
                  on_refresh: Callable[[], None] | None = None,
+                 on_health: Callable[[], dict[str, Any]] | None = None,
                  on_login: Callable[[], None] | None = None,
                  on_support: Callable[[], None] | None = None,
                  on_membership: Callable[[], None] | None = None,
@@ -26,6 +27,7 @@ class WebUiBridge:
                  on_stop_all: Callable[[], None] | None = None) -> None:
         self._state_provider = state_provider or (lambda: {})
         self._on_refresh = on_refresh
+        self._on_health = on_health
         self._on_login, self._on_support = on_login, on_support
         self._on_membership, self._on_logout, self._on_update = on_membership, on_logout, on_update
         self._on_add, self._on_remove = on_add, on_remove
@@ -38,6 +40,12 @@ class WebUiBridge:
     def refresh_library(self) -> None:
         if self._on_refresh:
             self._on_refresh()
+
+    def health_check(self) -> dict[str, Any]:
+        if self._on_health:
+            value = self._on_health()
+            return value if isinstance(value, dict) else {}
+        return {}
 
     def open_login(self) -> None:
         if self._on_login:
