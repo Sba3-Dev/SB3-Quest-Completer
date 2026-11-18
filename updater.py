@@ -13,6 +13,16 @@ import zipfile
 from pathlib import Path
 
 
+def write_log(message: str) -> None:
+    try:
+        log_dir = Path(os.getenv("LOCALAPPDATA", tempfile.gettempdir())) / "Sba3Dev"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        with (log_dir / "updater.log").open("a", encoding="utf-8") as stream:
+            stream.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}\n")
+    except OSError:
+        pass
+
+
 def wait_for_process(pid: int) -> None:
     if os.name != "nt" or pid <= 0:
         time.sleep(0.8)
@@ -54,21 +64,38 @@ def copy_tree(source: Path, target: Path) -> None:
             replace_file(item, destination)
 
 
+def launch_app(app_path: Path) -> bool:
+    if not app_path.is_file():
+        write_log(f"launch skipped; app missing: {app_path}")
+        return False
+    env = os.environ.copy()
+    env.pop("_MEIPASS2", None)
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    try:
+        child = subprocess.Popen([str(app_path)], cwd=str(app_path.parent), env=env,
+                                 close_fds=True)
+        time.sleep(0.8)
+        if child.poll() is None:
+            write_log(f"launch succeeded: {app_path}")
+            return True
+        write_log(f"launch exited immediately with code {child.returncode}")
+    except OSError as error:
+        write_log(f"direct launch failed: {error}")
+    if os.name == "nt":
+        try:
+            os.startfile(str(app_path))
+            write_log(f"launch fallback succeeded: {app_path}")
+            return True
+        except OSError as error:
+            write_log(f"launch fallback failed: {error}")
+    return False
+
+
 def restart_app(pid: int, app_path: Path) -> int:
     """Restart a one-file PyInstaller app after its old process has fully exited."""
     wait_for_process(pid)
     time.sleep(1.0)
-    env = os.environ.copy()
-    env.pop("_MEIPASS2", None)
-    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
-    if not app_path.is_file():
-        return 5
-    flags = 0
-    if os.name == "nt":
-        flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    subprocess.Popen([str(app_path)], cwd=str(app_path.parent), env=env, close_fds=True,
-                     creationflags=flags)
-    return 0
+    return 0 if launch_app(app_path) else 5
 
 
 def main() -> int:
@@ -109,17 +136,7 @@ def main() -> int:
             package.unlink(missing_ok=True)
         except OSError:
             pass
-        if not app_path.is_file():
-            return 5
-        env = os.environ.copy()
-        env.pop("_MEIPASS2", None)
-        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
-        flags = 0
-        if os.name == "nt":
-            flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-        subprocess.Popen([str(app_path)], cwd=str(install_dir), env=env, close_fds=True,
-                         creationflags=flags)
-        return 0
+        return 0 if launch_app(app_path) else 5
     finally:
         shutil.rmtree(stage, ignore_errors=True)
 
