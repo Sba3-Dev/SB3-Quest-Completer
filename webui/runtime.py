@@ -591,7 +591,7 @@ def launch_web_ui() -> bool:
     def create() -> None:
         window = webview.create_window("SB3 Quest Completer", str(mina.resource_path("webui/index.html")),
                                        width=1180, height=820, min_size=(980, 640),
-                                       frameless=True, easy_drag=False,
+                                       frameless=True, easy_drag=False, transparent=True,
                                        js_api=bridge)
         runtime = WebRuntime(window)
         runtime_holder["runtime"] = runtime

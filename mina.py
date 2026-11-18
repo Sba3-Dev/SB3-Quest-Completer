@@ -498,9 +498,9 @@ def discord_login() -> tuple[bool, str]:
                 icon = ""
             icon_html = f'<img src="data:image/x-icon;base64,{icon}" class="logo" alt="SB3">' if icon else '<div class="logo-fallback">SB3</div>'
             body = f'''<!doctype html><html lang="{'ar' if arabic else 'en'}" dir="{direction}"><head><meta charset="utf-8"><title>SB3</title>
-            <style>body{{margin:0;background:#0e080a;color:#f7eff0;font-family:Segoe UI,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}}
-            .card{{width:350px;padding:34px 28px;border:1px solid #3b2026;border-radius:24px;background:#1b0c10;text-align:center;box-shadow:0 18px 60px #0008}}
-            .logo{{width:78px;height:78px;object-fit:contain;margin-bottom:16px}}.logo-fallback{{font-size:30px;font-weight:700;color:#a7474d;margin-bottom:16px}}
+            <style>body{{margin:0;background:#050505;color:#f7eff0;font-family:Segoe UI,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px),radial-gradient(circle at 20% 20%,#421019 0,transparent 32%),radial-gradient(circle at 80% 80%,#260b12 0,transparent 35%);background-size:38px 38px,38px 38px,100% 100%,100% 100%}}
+            .card{{width:350px;padding:34px 28px;border:1px solid #591621;border-radius:24px;background:#16090c;text-align:center;box-shadow:0 18px 60px #0008}}
+            .logo{{width:78px;height:78px;object-fit:contain;margin-bottom:16px}}.logo-fallback{{font-size:30px;font-weight:700;color:#9b2638;margin-bottom:16px}}
             h1{{font-size:20px;margin:0 0 12px}}p{{color:#ccb8bc;font-size:14px;line-height:1.6;margin:0}}</style></head>
             <body><main class="card">{icon_html}<h1>{title}</h1><p>{message}</p></main></body></html>'''.encode("utf-8")
             self.send_response(200)
