@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.6.1"
+VERSION = "0.6.2"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -1885,30 +1885,9 @@ class QuestCompleterApp:
         self.render_queue()
 
     def open_settings_panel(self) -> None:
-        panel = self._show_in_app_panel(self.tr("settings_title"), 480)
+        panel = self._show_in_app_panel(self.tr("settings_title"), 260)
         tk.Label(panel, text=self.tr("settings_note"), bg=PANEL, fg=TEXT_DIM,
                  font=("Segoe UI", 9), justify="center").pack(pady=(0, 14))
-        tk.Label(panel, text=self.tr("text_size"), bg=PANEL, fg=TEXT, font=("Segoe UI", 10, "bold")).pack()
-        size_row = tk.Frame(panel, bg=PANEL)
-        size_row.pack(pady=(8, 16))
-        sizes = (("small", 0.9), ("default", 1.0), ("large", 1.15), ("xl", 1.25))
-        active_scale = float(self.appearance_settings.get("font_scale", 1.0))
-        for key, value in sizes:
-            selected = abs(active_scale - value) < 0.02
-            button = PillButton(size_row, text=self.tr(key), width=66, height=32, background=PANEL,
-                                fill=RED if selected else CARD, hover_fill=RED_HOVER if selected else CARD_HOVER,
-                                text_color=TEXT, command=lambda scale=value: self._set_appearance(font_scale=scale))
-            button.pack(side="left", padx=3)
-        tk.Label(panel, text=self.tr("contrast"), bg=PANEL, fg=TEXT, font=("Segoe UI", 10, "bold")).pack()
-        contrast_row = tk.Frame(panel, bg=PANEL)
-        contrast_row.pack(pady=(8, 16))
-        current_contrast = self.appearance_settings.get("contrast", "calm")
-        for key, value in (("calm", "calm"), ("high_contrast", "high")):
-            selected = current_contrast == value
-            button = PillButton(contrast_row, text=self.tr(key), width=132, height=34, background=PANEL,
-                                fill=RED if selected else CARD, hover_fill=RED_HOVER if selected else CARD_HOVER,
-                                text_color=TEXT, command=lambda mode=value: self._set_appearance(contrast=mode))
-            button.pack(side="left", padx=4)
         tk.Label(panel, text=self.tr("language"), bg=PANEL, fg=TEXT, font=("Segoe UI", 10, "bold")).pack()
         language_row = tk.Frame(panel, bg=PANEL)
         language_row.pack(pady=(8, 4))
