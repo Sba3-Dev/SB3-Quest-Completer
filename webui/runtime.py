@@ -156,7 +156,9 @@ class WebRuntime:
                     return {"status": "hold", "reason": "tasks_active"}
             saved_session = self.mina.load_discord_session()
             has_saved_session = bool(saved_session.get("refresh_token") or saved_session.get("access_token"))
-            valid, reason = self.mina.check_saved_discord_session(force_refresh=False)
+            # Refresh the saved Discord session so bootstrap receives the latest
+            # username and avatar, matching the v0.7.7 startup flow.
+            valid, reason = self.mina.check_saved_discord_session(force_refresh=True)
             if not valid:
                 status = "membership" if reason == "not_in_guild" else "login"
                 if reason == "network" and (has_saved_session or previous.get("status") == "main"):

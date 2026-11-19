@@ -43,3 +43,6 @@ button{transition:transform .1s ease,filter .1s ease,background-color .1s ease,b
 /* Final language direction and calm button treatment. */
 .primary-button{background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 48%,var(--bg)))!important;box-shadow:0 5px 15px rgba(var(--accent-rgb),.2)!important}.settings-choice.active{border-color:var(--accent-2)!important;background:var(--card-hover)!important;color:var(--text)!important;box-shadow:0 0 0 1px var(--accent-2),0 0 14px rgba(var(--accent-rgb),.2)}
 html[dir=rtl] .account-menu>button:not(.account-menu-head button){text-align:right}html[dir=rtl] .account-menu-head{direction:rtl}html[dir=rtl] .auth-footer{direction:rtl}html[dir=rtl] .update-meta-item{direction:rtl}html[dir=rtl] .window-controls{margin-left:0;margin-right:2px}
+
+/* Final theme coverage for every screen and overlay. */
+.confirm-modal{border-color:var(--line)!important;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 16%,var(--panel)),var(--panel))!important;color:var(--text)!important}.window-controls{border-color:var(--line)!important;background:var(--input)!important}.window-controls button{border-color:var(--line)!important;color:var(--dim)!important}.auth-footer,.auth-footer span,.support-link,.settings-status{color:var(--muted)!important}
