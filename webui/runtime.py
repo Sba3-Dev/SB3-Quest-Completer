@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import os
 import hashlib
-import json
 import shutil
 import subprocess
 import sys
@@ -61,7 +60,6 @@ class WebRuntime:
 
     def bootstrap(self) -> dict[str, Any]:
         session = self.mina.load_discord_session()
-        preferences = self._load_preferences()
         user = session.get("user") or {}
         user_id = str(user.get("id") or "")
         avatar_hash = str(user.get("avatar") or "")
@@ -70,50 +68,12 @@ class WebRuntime:
                   f"https://cdn.discordapp.com/embed/avatars/{int(user_id) % 5 if user_id.isdigit() else 0}.png")
         return {
             "version": self.mina.VERSION,
-            "authenticated": bool(session.get("access_token") or session.get("refresh_token")),
-            "language": preferences.get("language"),
-            "theme": preferences.get("theme"),
+            "authenticated": bool(session.get("access_token")),
             "user": user,
             "avatar": avatar,
             "games": self._public_games(),
             "queue": self._public_queue(),
         }
-
-    @staticmethod
-    def _preferences_file() -> Path:
-        return Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "settings.json"
-
-    @classmethod
-    def _load_preferences(cls) -> dict[str, str]:
-        try:
-            data = json.loads(cls._preferences_file().read_text(encoding="utf-8"))
-            if not isinstance(data, dict):
-                return {}
-            preferences: dict[str, str] = {}
-            if data.get("language") in {"en", "ar"}:
-                preferences["language"] = data["language"]
-            if data.get("theme") in {"white", "black", "midnight", "graphite", "silver", "red", "purple", "turquoise"}:
-                preferences["theme"] = data["theme"]
-            return preferences
-        except (OSError, ValueError, TypeError):
-            return {}
-
-    @classmethod
-    def save_preferences(cls, language: str, theme: str) -> None:
-        if language not in {"en", "ar"} or theme not in {"white", "black", "midnight", "graphite", "silver", "red", "purple", "turquoise"}:
-            return
-        path = cls._preferences_file()
-        try:
-            data = {}
-            if path.exists():
-                loaded = json.loads(path.read_text(encoding="utf-8"))
-                if isinstance(loaded, dict):
-                    data = loaded
-            data.update({"language": language, "theme": theme})
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        except (OSError, ValueError, TypeError):
-            pass
 
     def refresh_library(self) -> None:
         if not requests:
@@ -122,12 +82,14 @@ class WebRuntime:
         threading.Thread(target=self._load_library, daemon=True, name="sb3-web-library").start()
 
     def health_check(self, full_check: bool = True) -> dict[str, Any]:
-        """Run the startup health gate and return the appropriate destination."""
+        """Return cached state every second; refresh network state at most every 15s."""
         if not full_check:
             return self._update_only_check()
         with self.lock:
+            if self.queue or self.active:
+                return {"status": "hold", "reason": "tasks_active"}
             now = time.monotonic()
-            if self.health_busy or now - self.health_checked_at < 4:
+            if self.health_busy or now - self.health_checked_at < 15:
                 return dict(self.health_state)
             self.health_busy = True
             self.health_checked_at = now
@@ -138,7 +100,7 @@ class WebRuntime:
             if requests:
                 try:
                     response = requests.get(self.mina.UPDATE_MANIFEST_URL,
-                                            headers=self.mina.HEADERS, timeout=(2, 5))
+                                            headers=self.mina.HEADERS, timeout=(3, 8))
                     response.raise_for_status()
                     manifest = response.json()
                     latest = str(manifest.get("version") or "").strip()
@@ -151,17 +113,10 @@ class WebRuntime:
                         return dict(state)
                 except Exception:
                     pass
-            with self.lock:
-                if self.queue or self.active:
-                    return {"status": "hold", "reason": "tasks_active"}
-            saved_session = self.mina.load_discord_session()
-            has_saved_session = bool(saved_session.get("refresh_token") or saved_session.get("access_token"))
-            # Refresh the saved Discord session so bootstrap receives the latest
-            # username and avatar, matching the v0.7.7 startup flow.
             valid, reason = self.mina.check_saved_discord_session(force_refresh=True)
             if not valid:
                 status = "membership" if reason == "not_in_guild" else "login"
-                if reason == "network" and (has_saved_session or previous.get("status") == "main"):
+                if reason == "network" and previous.get("status") == "main":
                     status = "main"
                 state = {"status": status, "reason": reason, "version": self.mina.VERSION}
             else:
@@ -173,32 +128,11 @@ class WebRuntime:
             with self.lock:
                 self.health_busy = False
 
-    def check_updates(self) -> dict[str, Any]:
-        """Perform a fresh manifest request for the manual Settings check."""
-        if not requests or not self.mina.UPDATE_MANIFEST_URL:
-            return {"status": "error", "reason": "updates_unavailable"}
-        try:
-            response = requests.get(self.mina.UPDATE_MANIFEST_URL,
-                                    headers=self.mina.HEADERS, timeout=(5, 15))
-            response.raise_for_status()
-            manifest = response.json()
-            latest = str(manifest.get("version") or "").strip()
-            installer = str(manifest.get("installer_url") or "").strip()
-            if latest and installer and _version_tuple(latest) > _version_tuple(self.mina.VERSION):
-                state = {"status": "update", "version": self.mina.VERSION,
-                         "latest": latest, "manifest": manifest}
-                with self.lock:
-                    self.health_state = state
-                return dict(state)
-            return {"status": "up_to_date", "version": self.mina.VERSION}
-        except Exception as exc:
-            return {"status": "error", "reason": str(exc)}
-
     def _update_only_check(self) -> dict[str, Any]:
         """Check only the manifest; never re-check login or server membership."""
         with self.lock:
             now = time.monotonic()
-            if self.health_busy or now - self.health_checked_at < 4:
+            if self.health_busy or now - self.health_checked_at < 15:
                 return dict(self.health_state)
             self.health_busy = True
             self.health_checked_at = now
@@ -207,7 +141,7 @@ class WebRuntime:
             if requests:
                 try:
                     response = requests.get(self.mina.UPDATE_MANIFEST_URL,
-                                            headers=self.mina.HEADERS, timeout=(2, 5))
+                                            headers=self.mina.HEADERS, timeout=(3, 8))
                     response.raise_for_status()
                     manifest = response.json()
                     latest = str(manifest.get("version") or "").strip()
@@ -311,7 +245,7 @@ class WebRuntime:
         speed = received / elapsed
         remaining = "Calculating…" if not speed or not total else self._format_duration((total - received) / speed)
         self._evaluate("document.getElementById('update-remaining').textContent=%s;document.getElementById('update-size').textContent=%s" %
-                        (self._json(remaining), self._json(size)))
+                        (self._json(f"Time remaining: {remaining}"), self._json(f"Update size: {size}")))
 
     @staticmethod
     def _format_bytes(value: int) -> str:
@@ -331,7 +265,6 @@ class WebRuntime:
 
     def _download_update_worker(self, manifest: dict[str, Any]) -> None:
         temp_path: Path | None = None
-        download = None
         try:
             if os.name != "nt":
                 raise RuntimeError("Windows installer can only run on Windows")
@@ -341,38 +274,30 @@ class WebRuntime:
                 raise ValueError("update package URL is missing")
             self._evaluate("document.getElementById('update-button').disabled=true")
             self._update_ui("Downloading update…", 0.0)
-            with requests.get(package_url, timeout=(10, 120), stream=True) as download:
-                download.raise_for_status()
-                total = int(download.headers.get('content-length') or manifest.get('package_size') or 0)
-                received = 0
-                started_at = time.monotonic()
-                last_meta = 0.0
-                last_ui = 0.0
-                self._update_meta(0, total, started_at)
-                temp_path = Path(tempfile.gettempdir()) / f"SB3QuestCompleter-update-{latest}.zip"
-                with temp_path.open("wb") as target:
-                    for chunk in download.iter_content(chunk_size=1024 * 1024):
-                        if self.update_cancel_event.is_set():
-                            download.close()
-                            temp_path.unlink(missing_ok=True)
-                            self._reset_update_ui("Update cancelled")
-                            return
-                        if not chunk:
-                            continue
-                        target.write(chunk)
-                        received += len(chunk)
-                        now = time.monotonic()
-                        if now - last_ui >= 0.08 or (total and received >= total):
-                            self._update_ui(f"Downloading update… {int(received / total * 100) if total else 0}%",
-                                            received / total if total else None)
-                            last_ui = now
-                        if now - last_meta >= 0.25 or (total and received >= total):
-                            self._update_meta(received, total, started_at)
-                            last_meta = now
-            if self.update_cancel_event.is_set():
-                temp_path.unlink(missing_ok=True)
-                self._reset_update_ui("Update cancelled")
-                return
+            download = requests.get(package_url, timeout=(10, 120), stream=True)
+            download.raise_for_status()
+            total = int(download.headers.get("content-length") or manifest.get("package_size") or 0)
+            received = 0
+            started_at = time.monotonic()
+            last_meta = 0.0
+            self._update_meta(0, total, started_at)
+            temp_path = Path(tempfile.gettempdir()) / f"SB3QuestCompleter-update-{latest}.zip"
+            with temp_path.open("wb") as target:
+                for chunk in download.iter_content(chunk_size=1024 * 1024):
+                    if not chunk:
+                        continue
+                    if self.update_cancel_event.is_set():
+                        temp_path.unlink(missing_ok=True)
+                        self._evaluate("document.getElementById('update-button').hidden=false;document.getElementById('cancel-update').hidden=true;document.getElementById('update-progress-fill').style.width='0%'")
+                        self._update_ui("Update cancelled")
+                        return
+                    target.write(chunk)
+                    received += len(chunk)
+                    self._update_ui(f"Downloading update… {int(received / total * 100) if total else 0}%",
+                                    received / total if total else None)
+                    if time.monotonic() - last_meta >= 0.25 or (total and received >= total):
+                        self._update_meta(received, total, started_at)
+                        last_meta = time.monotonic()
             expected_hash = str(manifest.get("package_sha256") or manifest.get("sha256") or "").strip().casefold()
             if expected_hash:
                 digest = hashlib.sha256(temp_path.read_bytes()).hexdigest().casefold()
@@ -385,10 +310,6 @@ class WebRuntime:
                 updater_path = self.mina.resource_path("SB3Updater.exe")
             if not updater_path.exists():
                 raise FileNotFoundError("SB3Updater.exe is missing")
-            if self.update_cancel_event.is_set():
-                temp_path.unlink(missing_ok=True)
-                self._reset_update_ui("Update cancelled")
-                return
             self._update_ui("Installing update…", 1.0)
             subprocess.Popen([str(updater_path), str(temp_path), str(install_dir),
                               str(os.getpid()), str(app_path)], close_fds=True)
@@ -399,18 +320,11 @@ class WebRuntime:
                     temp_path.unlink(missing_ok=True)
                 except OSError:
                     pass
-            if self.update_cancel_event.is_set():
-                self._reset_update_ui("Update cancelled")
-            else:
-                self._reset_update_ui(f"Update failed: {exc}")
+            self._evaluate("document.getElementById('update-button').hidden=false;document.getElementById('cancel-update').hidden=true")
+            self._update_ui(f"Update failed: {exc}")
         finally:
             with self.lock:
                 self.update_busy = False
-
-    def _reset_update_ui(self, message: str) -> None:
-        """Restore a consistent update screen after completion, failure, or cancellation."""
-        self._evaluate("document.getElementById('update-button').hidden=false;document.getElementById('update-button').disabled=false;document.getElementById('cancel-update').hidden=true;document.getElementById('cancel-update').disabled=false;document.getElementById('cancel-update').textContent='Cancel';document.getElementById('update-progress-fill').style.width='0%'")
-        self._update_ui(message)
 
     def _load_library(self) -> None:
         try:
@@ -652,8 +566,6 @@ def launch_web_ui() -> bool:
         state_provider=lambda: runtime_holder["runtime"].bootstrap() if "runtime" in runtime_holder else {},
         on_refresh=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_library(),
         on_health=lambda full_check=True: runtime_holder["runtime"].health_check(full_check) if "runtime" in runtime_holder else {},
-        on_check_updates=lambda: runtime_holder["runtime"].check_updates() if "runtime" in runtime_holder else {},
-        on_save_preferences=lambda language, theme: runtime_holder["runtime"].save_preferences(language, theme) if "runtime" in runtime_holder else None,
         on_login=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_login(),
         on_support=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_support(),
         on_membership=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_membership(),

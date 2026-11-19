@@ -15,8 +15,6 @@ class WebUiBridge:
     def __init__(self, *, state_provider: Callable[[], dict[str, Any]] | None = None,
                  on_refresh: Callable[[], None] | None = None,
                  on_health: Callable[[], dict[str, Any]] | None = None,
-                 on_check_updates: Callable[[], dict[str, Any]] | None = None,
-                 on_save_preferences: Callable[[str, str], None] | None = None,
                  on_login: Callable[[], None] | None = None,
                  on_support: Callable[[], None] | None = None,
                  on_membership: Callable[[], None] | None = None,
@@ -35,8 +33,6 @@ class WebUiBridge:
         self._state_provider = state_provider or (lambda: {})
         self._on_refresh = on_refresh
         self._on_health = on_health
-        self._on_check_updates = on_check_updates
-        self._on_save_preferences = on_save_preferences
         self._on_login, self._on_support = on_login, on_support
         self._on_membership, self._on_logout, self._on_update = on_membership, on_logout, on_update
         self._on_cancel_update = on_cancel_update
@@ -58,16 +54,6 @@ class WebUiBridge:
             value = self._on_health(full_check)
             return value if isinstance(value, dict) else {}
         return {}
-
-    def check_updates(self) -> dict[str, Any]:
-        if self._on_check_updates:
-            value = self._on_check_updates()
-            return value if isinstance(value, dict) else {}
-        return {}
-
-    def save_preferences(self, language: str, theme: str) -> None:
-        if self._on_save_preferences and isinstance(language, str) and isinstance(theme, str):
-            self._on_save_preferences(language, theme)
 
     def open_login(self) -> None:
         if self._on_login:

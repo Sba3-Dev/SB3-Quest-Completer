@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.9.1"
+VERSION = "0.7.6"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -390,8 +390,7 @@ def resource_path(name: str) -> Path:
 
 
 def discord_session_file() -> Path:
-    base = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA") or str(Path.home())
-    return Path(base) / "Sba3Dev" / "discord_session.json"
+    return Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "discord_session.json"
 
 
 def load_discord_session() -> dict[str, Any]:
@@ -406,9 +405,7 @@ def save_discord_session(data: dict[str, Any]) -> None:
     try:
         path = discord_session_file()
         path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(".json.tmp")
-        temporary.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-        os.replace(temporary, path)
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     except OSError:
         pass
 
