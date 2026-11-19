@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.7.8"
+VERSION = "0.7.9"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -484,15 +484,31 @@ def discord_login() -> tuple[bool, str]:
             direction = "ltr"
             title = "Signed in successfully"
             message = "You can close this page and return to the app."
+            theme = {"accent": "#c72e49", "accent2": "#ef5c70", "bg": "#100609", "panel": "#170b12", "line": "#4a2530"}
+            try:
+                settings = json.loads((Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "settings.json").read_text(encoding="utf-8"))
+                themes = {
+                    "white": {"accent": "#eeeeee", "accent2": "#ffffff", "bg": "#0f0f0f", "panel": "#202020", "line": "#4a4a4a"},
+                    "black": {"accent": "#8b8f99", "accent2": "#c3c7ce", "bg": "#090a0c", "panel": "#15171b", "line": "#30333a"},
+                    "midnight": {"accent": "#238fca", "accent2": "#58b8e8", "bg": "#071018", "panel": "#0d1d29", "line": "#233e52"},
+                    "graphite": {"accent": "#477fbe", "accent2": "#78a7df", "bg": "#0b1118", "panel": "#121c28", "line": "#34485e"},
+                    "silver": {"accent": "#31a9c1", "accent2": "#67d2e2", "bg": "#081214", "panel": "#102326", "line": "#2e5962"},
+                    "red": theme,
+                    "purple": {"accent": "#8f5ac2", "accent2": "#bd8ae8", "bg": "#0e0915", "panel": "#1b1026", "line": "#49365f"},
+                    "turquoise": {"accent": "#36a9a4", "accent2": "#69d4c8", "bg": "#071211", "panel": "#0e2422", "line": "#285953"},
+                }
+                theme = themes.get(str(settings.get("theme")), theme) if isinstance(settings, dict) else theme
+            except (OSError, ValueError, TypeError):
+                pass
             try:
                 icon = base64.b64encode(resource_path("logo.ico").read_bytes()).decode("ascii")
             except OSError:
                 icon = ""
             icon_html = f'<img src="data:image/x-icon;base64,{icon}" class="logo" alt="SB3">' if icon else '<div class="logo-fallback">SB3</div>'
             body = f'''<!doctype html><html lang="en" dir="{direction}"><head><meta charset="utf-8"><title>SB3</title>
-            <style>body{{margin:0;background:#050505;color:#f7eff0;font-family:Segoe UI,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px),radial-gradient(circle at 20% 20%,#421019 0,transparent 32%),radial-gradient(circle at 80% 80%,#260b12 0,transparent 35%);background-size:38px 38px,38px 38px,100% 100%,100% 100%}}
-            .card{{width:350px;padding:34px 28px;border:1px solid #591621;border-radius:24px;background:#16090c;text-align:center;box-shadow:0 18px 60px #0008}}
-            .logo{{width:78px;height:78px;object-fit:contain;margin-bottom:16px}}.logo-fallback{{font-size:30px;font-weight:700;color:#9b2638;margin-bottom:16px}}
+            <style>body{{margin:0;background:{theme["bg"]};color:#f7eff0;font-family:Segoe UI,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px),radial-gradient(circle at 20% 20%,{theme["accent"]}55 0,transparent 32%),radial-gradient(circle at 80% 80%,{theme["accent2"]}33 0,transparent 35%);background-size:38px 38px,38px 38px,100% 100%,100% 100%}}
+            .card{{width:350px;padding:34px 28px;border:1px solid {theme["line"]};border-radius:24px;background:{theme["panel"]};text-align:center;box-shadow:0 18px 60px #0008}}
+            .logo{{width:78px;height:78px;object-fit:contain;margin-bottom:16px}}.logo-fallback{{font-size:30px;font-weight:700;color:{theme["accent2"]};margin-bottom:16px}}
             h1{{font-size:20px;margin:0 0 12px}}p{{color:#ccb8bc;font-size:14px;line-height:1.6;margin:0}}</style></head>
             <body><main class="card">{icon_html}<h1>{title}</h1><p>{message}</p></main></body></html>'''.encode("utf-8")
             self.send_response(200)
