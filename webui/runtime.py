@@ -89,7 +89,7 @@ class WebRuntime:
             if self.queue or self.active:
                 return {"status": "hold", "reason": "tasks_active"}
             now = time.monotonic()
-            if self.health_busy or now - self.health_checked_at < 15:
+            if self.health_busy or now - self.health_checked_at < 4:
                 return dict(self.health_state)
             self.health_busy = True
             self.health_checked_at = now
@@ -100,7 +100,7 @@ class WebRuntime:
             if requests:
                 try:
                     response = requests.get(self.mina.UPDATE_MANIFEST_URL,
-                                            headers=self.mina.HEADERS, timeout=(3, 8))
+                                            headers=self.mina.HEADERS, timeout=(2, 5))
                     response.raise_for_status()
                     manifest = response.json()
                     latest = str(manifest.get("version") or "").strip()
@@ -132,7 +132,7 @@ class WebRuntime:
         """Check only the manifest; never re-check login or server membership."""
         with self.lock:
             now = time.monotonic()
-            if self.health_busy or now - self.health_checked_at < 15:
+            if self.health_busy or now - self.health_checked_at < 4:
                 return dict(self.health_state)
             self.health_busy = True
             self.health_checked_at = now
@@ -141,7 +141,7 @@ class WebRuntime:
             if requests:
                 try:
                     response = requests.get(self.mina.UPDATE_MANIFEST_URL,
-                                            headers=self.mina.HEADERS, timeout=(3, 8))
+                                            headers=self.mina.HEADERS, timeout=(2, 5))
                     response.raise_for_status()
                     manifest = response.json()
                     latest = str(manifest.get("version") or "").strip()
