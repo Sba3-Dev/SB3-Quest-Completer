@@ -122,7 +122,7 @@ class WebRuntime:
         threading.Thread(target=self._load_library, daemon=True, name="sb3-web-library").start()
 
     def health_check(self, full_check: bool = True) -> dict[str, Any]:
-        """Return cached state every second; refresh network state at most every 15s."""
+        """Run the startup health gate and return the appropriate destination."""
         if not full_check:
             return self._update_only_check()
         with self.lock:
