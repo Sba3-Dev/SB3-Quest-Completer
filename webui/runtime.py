@@ -86,8 +86,6 @@ class WebRuntime:
         if not full_check:
             return self._update_only_check()
         with self.lock:
-            if self.queue or self.active:
-                return {"status": "hold", "reason": "tasks_active"}
             now = time.monotonic()
             if self.health_busy or now - self.health_checked_at < 4:
                 return dict(self.health_state)
@@ -113,6 +111,9 @@ class WebRuntime:
                         return dict(state)
                 except Exception:
                     pass
+            with self.lock:
+                if self.queue or self.active:
+                    return {"status": "hold", "reason": "tasks_active"}
             valid, reason = self.mina.check_saved_discord_session(force_refresh=True)
             if not valid:
                 status = "membership" if reason == "not_in_guild" else "login"
