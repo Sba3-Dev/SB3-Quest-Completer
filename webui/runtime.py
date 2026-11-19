@@ -245,7 +245,7 @@ class WebRuntime:
         speed = received / elapsed
         remaining = "Calculating…" if not speed or not total else self._format_duration((total - received) / speed)
         self._evaluate("document.getElementById('update-remaining').textContent=%s;document.getElementById('update-size').textContent=%s" %
-                        (self._json(f"Time remaining: {remaining}"), self._json(f"Update size: {size}")))
+                        (self._json(remaining), self._json(size)))
 
     @staticmethod
     def _format_bytes(value: int) -> str:
@@ -265,6 +265,7 @@ class WebRuntime:
 
     def _download_update_worker(self, manifest: dict[str, Any]) -> None:
         temp_path: Path | None = None
+        download = None
         try:
             if os.name != "nt":
                 raise RuntimeError("Windows installer can only run on Windows")
@@ -274,30 +275,38 @@ class WebRuntime:
                 raise ValueError("update package URL is missing")
             self._evaluate("document.getElementById('update-button').disabled=true")
             self._update_ui("Downloading update…", 0.0)
-            download = requests.get(package_url, timeout=(10, 120), stream=True)
-            download.raise_for_status()
-            total = int(download.headers.get("content-length") or manifest.get("package_size") or 0)
-            received = 0
-            started_at = time.monotonic()
-            last_meta = 0.0
-            self._update_meta(0, total, started_at)
-            temp_path = Path(tempfile.gettempdir()) / f"SB3QuestCompleter-update-{latest}.zip"
-            with temp_path.open("wb") as target:
-                for chunk in download.iter_content(chunk_size=1024 * 1024):
-                    if not chunk:
-                        continue
-                    if self.update_cancel_event.is_set():
-                        temp_path.unlink(missing_ok=True)
-                        self._evaluate("document.getElementById('update-button').hidden=false;document.getElementById('cancel-update').hidden=true;document.getElementById('update-progress-fill').style.width='0%'")
-                        self._update_ui("Update cancelled")
-                        return
-                    target.write(chunk)
-                    received += len(chunk)
-                    self._update_ui(f"Downloading update… {int(received / total * 100) if total else 0}%",
-                                    received / total if total else None)
-                    if time.monotonic() - last_meta >= 0.25 or (total and received >= total):
-                        self._update_meta(received, total, started_at)
-                        last_meta = time.monotonic()
+            with requests.get(package_url, timeout=(10, 120), stream=True) as download:
+                download.raise_for_status()
+                total = int(download.headers.get('content-length') or manifest.get('package_size') or 0)
+                received = 0
+                started_at = time.monotonic()
+                last_meta = 0.0
+                last_ui = 0.0
+                self._update_meta(0, total, started_at)
+                temp_path = Path(tempfile.gettempdir()) / f"SB3QuestCompleter-update-{latest}.zip"
+                with temp_path.open("wb") as target:
+                    for chunk in download.iter_content(chunk_size=1024 * 1024):
+                        if self.update_cancel_event.is_set():
+                            download.close()
+                            temp_path.unlink(missing_ok=True)
+                            self._reset_update_ui("Update cancelled")
+                            return
+                        if not chunk:
+                            continue
+                        target.write(chunk)
+                        received += len(chunk)
+                        now = time.monotonic()
+                        if now - last_ui >= 0.08 or (total and received >= total):
+                            self._update_ui(f"Downloading update… {int(received / total * 100) if total else 0}%",
+                                            received / total if total else None)
+                            last_ui = now
+                        if now - last_meta >= 0.25 or (total and received >= total):
+                            self._update_meta(received, total, started_at)
+                            last_meta = now
+            if self.update_cancel_event.is_set():
+                temp_path.unlink(missing_ok=True)
+                self._reset_update_ui("Update cancelled")
+                return
             expected_hash = str(manifest.get("package_sha256") or manifest.get("sha256") or "").strip().casefold()
             if expected_hash:
                 digest = hashlib.sha256(temp_path.read_bytes()).hexdigest().casefold()
@@ -310,6 +319,10 @@ class WebRuntime:
                 updater_path = self.mina.resource_path("SB3Updater.exe")
             if not updater_path.exists():
                 raise FileNotFoundError("SB3Updater.exe is missing")
+            if self.update_cancel_event.is_set():
+                temp_path.unlink(missing_ok=True)
+                self._reset_update_ui("Update cancelled")
+                return
             self._update_ui("Installing update…", 1.0)
             subprocess.Popen([str(updater_path), str(temp_path), str(install_dir),
                               str(os.getpid()), str(app_path)], close_fds=True)
@@ -320,11 +333,18 @@ class WebRuntime:
                     temp_path.unlink(missing_ok=True)
                 except OSError:
                     pass
-            self._evaluate("document.getElementById('update-button').hidden=false;document.getElementById('cancel-update').hidden=true")
-            self._update_ui(f"Update failed: {exc}")
+            if self.update_cancel_event.is_set():
+                self._reset_update_ui("Update cancelled")
+            else:
+                self._reset_update_ui(f"Update failed: {exc}")
         finally:
             with self.lock:
                 self.update_busy = False
+
+    def _reset_update_ui(self, message: str) -> None:
+        """Restore a consistent update screen after completion, failure, or cancellation."""
+        self._evaluate("document.getElementById('update-button').hidden=false;document.getElementById('update-button').disabled=false;document.getElementById('cancel-update').hidden=true;document.getElementById('cancel-update').disabled=false;document.getElementById('cancel-update').textContent='Cancel';document.getElementById('update-progress-fill').style.width='0%'")
+        self._update_ui(message)
 
     def _load_library(self) -> None:
         try:
