@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import hashlib
+import json
 import shutil
 import subprocess
 import sys
@@ -60,6 +61,7 @@ class WebRuntime:
 
     def bootstrap(self) -> dict[str, Any]:
         session = self.mina.load_discord_session()
+        preferences = self._load_preferences()
         user = session.get("user") or {}
         user_id = str(user.get("id") or "")
         avatar_hash = str(user.get("avatar") or "")
@@ -69,11 +71,49 @@ class WebRuntime:
         return {
             "version": self.mina.VERSION,
             "authenticated": bool(session.get("access_token") or session.get("refresh_token")),
+            "language": preferences.get("language"),
+            "theme": preferences.get("theme"),
             "user": user,
             "avatar": avatar,
             "games": self._public_games(),
             "queue": self._public_queue(),
         }
+
+    @staticmethod
+    def _preferences_file() -> Path:
+        return Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "settings.json"
+
+    @classmethod
+    def _load_preferences(cls) -> dict[str, str]:
+        try:
+            data = json.loads(cls._preferences_file().read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                return {}
+            preferences: dict[str, str] = {}
+            if data.get("language") in {"en", "ar"}:
+                preferences["language"] = data["language"]
+            if data.get("theme") in {"white", "black", "midnight", "graphite", "silver", "red", "purple", "turquoise"}:
+                preferences["theme"] = data["theme"]
+            return preferences
+        except (OSError, ValueError, TypeError):
+            return {}
+
+    @classmethod
+    def save_preferences(cls, language: str, theme: str) -> None:
+        if language not in {"en", "ar"} or theme not in {"white", "black", "midnight", "graphite", "silver", "red", "purple", "turquoise"}:
+            return
+        path = cls._preferences_file()
+        try:
+            data = {}
+            if path.exists():
+                loaded = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    data = loaded
+            data.update({"language": language, "theme": theme})
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except (OSError, ValueError, TypeError):
+            pass
 
     def refresh_library(self) -> None:
         if not requests:
@@ -611,6 +651,7 @@ def launch_web_ui() -> bool:
         on_refresh=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_library(),
         on_health=lambda full_check=True: runtime_holder["runtime"].health_check(full_check) if "runtime" in runtime_holder else {},
         on_check_updates=lambda: runtime_holder["runtime"].check_updates() if "runtime" in runtime_holder else {},
+        on_save_preferences=lambda language, theme: runtime_holder["runtime"].save_preferences(language, theme) if "runtime" in runtime_holder else None,
         on_login=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_login(),
         on_support=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_support(),
         on_membership=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_membership(),
