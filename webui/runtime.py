@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import hashlib
+import json
 import shutil
 import subprocess
 import sys
@@ -60,6 +61,7 @@ class WebRuntime:
 
     def bootstrap(self) -> dict[str, Any]:
         session = self.mina.load_discord_session()
+        theme = self._load_theme()
         user = session.get("user") or {}
         user_id = str(user.get("id") or "")
         avatar_hash = str(user.get("avatar") or "")
@@ -69,17 +71,68 @@ class WebRuntime:
         return {
             "version": self.mina.VERSION,
             "authenticated": bool(session.get("access_token")),
+            "theme": theme,
             "user": user,
             "avatar": avatar,
             "games": self._public_games(),
             "queue": self._public_queue(),
         }
 
+    @staticmethod
+    def _preferences_file() -> Path:
+        return Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "settings.json"
+
+    @classmethod
+    def _load_theme(cls) -> str:
+        try:
+            data = json.loads(cls._preferences_file().read_text(encoding="utf-8"))
+            value = data.get("theme") if isinstance(data, dict) else "red"
+            return value if value in {"white", "black", "midnight", "graphite", "silver", "red", "purple", "turquoise"} else "red"
+        except (OSError, ValueError, TypeError):
+            return "red"
+
+    @classmethod
+    def save_theme(cls, theme: str) -> None:
+        allowed = {"white", "black", "midnight", "graphite", "silver", "red", "purple", "turquoise"}
+        if theme not in allowed:
+            return
+        path = cls._preferences_file()
+        try:
+            data = {}
+            if path.exists():
+                loaded = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    data = loaded
+            data["theme"] = theme
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except (OSError, ValueError, TypeError):
+            pass
+
     def refresh_library(self) -> None:
         if not requests:
             self._notify("Requests is not installed")
             return
         threading.Thread(target=self._load_library, daemon=True, name="sb3-web-library").start()
+
+    def check_updates(self) -> dict[str, Any]:
+        if not requests or not self.mina.UPDATE_MANIFEST_URL:
+            return {"status": "error", "reason": "updates_unavailable"}
+        try:
+            response = requests.get(self.mina.UPDATE_MANIFEST_URL,
+                                    headers=self.mina.HEADERS, timeout=(5, 15))
+            response.raise_for_status()
+            manifest = response.json()
+            latest = str(manifest.get("version") or "").strip()
+            installer = str(manifest.get("installer_url") or "").strip()
+            if latest and installer and _version_tuple(latest) > _version_tuple(self.mina.VERSION):
+                state = {"status": "update", "version": self.mina.VERSION, "latest": latest, "manifest": manifest}
+                with self.lock:
+                    self.health_state = state
+                return state
+            return {"status": "up_to_date", "version": self.mina.VERSION}
+        except Exception as exc:
+            return {"status": "error", "reason": str(exc)}
 
     def health_check(self, full_check: bool = True) -> dict[str, Any]:
         """Return cached state every second; refresh network state at most every 15s."""
@@ -566,6 +619,8 @@ def launch_web_ui() -> bool:
         state_provider=lambda: runtime_holder["runtime"].bootstrap() if "runtime" in runtime_holder else {},
         on_refresh=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_library(),
         on_health=lambda full_check=True: runtime_holder["runtime"].health_check(full_check) if "runtime" in runtime_holder else {},
+        on_check_updates=lambda: runtime_holder["runtime"].check_updates() if "runtime" in runtime_holder else {},
+        on_save_theme=lambda theme: runtime_holder["runtime"].save_theme(theme) if "runtime" in runtime_holder else None,
         on_login=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_login(),
         on_support=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_support(),
         on_membership=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_membership(),

@@ -45,7 +45,7 @@ except ImportError:
     webview = None
 
 APP_NAME = "SB3 Quest Completer"
-VERSION = "0.7.6"
+VERSION = "0.7.8"
 # Set this to the raw URL of the public update.json file in your GitHub repository.
 # Example: https://raw.githubusercontent.com/OWNER/REPO/main/update.json
 UPDATE_MANIFEST_URL = os.getenv(
@@ -481,23 +481,15 @@ def discord_login() -> tuple[bool, str]:
             returned_state = str((params.get("state") or [""])[0])
             error = str((params.get("error") or [""])[0])
             result_queue.put((code if returned_state == state else "", error or "state_error" if returned_state != state else ""))
-            language = "en"
-            try:
-                settings_path = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "settings.json"
-                settings = json.loads(settings_path.read_text(encoding="utf-8"))
-                language = str(settings.get("language", "en")) if isinstance(settings, dict) else "en"
-            except (OSError, ValueError, TypeError):
-                pass
-            arabic = language == "ar"
-            direction = "rtl" if arabic else "ltr"
-            title = "تم تسجيل الدخول بنجاح" if arabic else "Signed in successfully"
-            message = "يمكنك إغلاق هذه الصفحة والعودة إلى الأداة." if arabic else "You can close this page and return to the app."
+            direction = "ltr"
+            title = "Signed in successfully"
+            message = "You can close this page and return to the app."
             try:
                 icon = base64.b64encode(resource_path("logo.ico").read_bytes()).decode("ascii")
             except OSError:
                 icon = ""
             icon_html = f'<img src="data:image/x-icon;base64,{icon}" class="logo" alt="SB3">' if icon else '<div class="logo-fallback">SB3</div>'
-            body = f'''<!doctype html><html lang="{'ar' if arabic else 'en'}" dir="{direction}"><head><meta charset="utf-8"><title>SB3</title>
+            body = f'''<!doctype html><html lang="en" dir="{direction}"><head><meta charset="utf-8"><title>SB3</title>
             <style>body{{margin:0;background:#050505;color:#f7eff0;font-family:Segoe UI,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px),radial-gradient(circle at 20% 20%,#421019 0,transparent 32%),radial-gradient(circle at 80% 80%,#260b12 0,transparent 35%);background-size:38px 38px,38px 38px,100% 100%,100% 100%}}
             .card{{width:350px;padding:34px 28px;border:1px solid #591621;border-radius:24px;background:#16090c;text-align:center;box-shadow:0 18px 60px #0008}}
             .logo{{width:78px;height:78px;object-fit:contain;margin-bottom:16px}}.logo-fallback{{font-size:30px;font-weight:700;color:#9b2638;margin-bottom:16px}}
@@ -1581,17 +1573,15 @@ class QuestCompleterApp:
         return Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "settings.json"
 
     def load_appearance_settings(self) -> dict[str, Any]:
-        defaults: dict[str, Any] = {"font_scale": 1.0, "contrast": "calm", "language": "en"}
+        defaults: dict[str, Any] = {"font_scale": 1.0, "contrast": "calm"}
         try:
             data = json.loads(self.settings_file().read_text(encoding="utf-8"))
             if not isinstance(data, dict):
                 return defaults
             scale = float(data.get("font_scale", defaults["font_scale"]))
             contrast = str(data.get("contrast", defaults["contrast"]))
-            language = str(data.get("language", defaults["language"]))
             return {"font_scale": min(1.25, max(0.9, scale)),
-                    "contrast": contrast if contrast in {"calm", "high"} else "calm",
-                    "language": language if language in {"en", "ar"} else "en"}
+                    "contrast": contrast if contrast in {"calm", "high"} else "calm"}
         except (OSError, ValueError, TypeError):
             return defaults
 
@@ -1604,7 +1594,7 @@ class QuestCompleterApp:
             pass
 
     def tr(self, key: str, **values: Any) -> str:
-        text = UI_TEXT.get(self.appearance_settings.get("language", "en"), UI_TEXT["en"]).get(key, key)
+        text = UI_TEXT["en"].get(key, key)
         return text.format(**values)
 
     def _apply_appearance_palette(self) -> None:
@@ -1861,14 +1851,11 @@ class QuestCompleterApp:
         join.pack(pady=(0, 10))
         tk.Label(panel, text="https://discord.gg/WcknYK29Hq", bg=PANEL, fg=MUTED, font=("Segoe UI", 8)).pack()
 
-    def _set_appearance(self, *, font_scale: float | None = None, contrast: str | None = None,
-                        language: str | None = None) -> None:
+    def _set_appearance(self, *, font_scale: float | None = None, contrast: str | None = None) -> None:
         if font_scale is not None:
             self.appearance_settings["font_scale"] = min(1.25, max(0.9, float(font_scale)))
         if contrast in {"calm", "high"}:
             self.appearance_settings["contrast"] = contrast
-        if language in {"en", "ar"}:
-            self.appearance_settings["language"] = language
         self.save_appearance_settings()
         self._apply_appearance_palette()
         if self.auth_screen == "update" and self.auth_busy:
@@ -1907,19 +1894,9 @@ class QuestCompleterApp:
         self.render_queue()
 
     def open_settings_panel(self) -> None:
-        panel = self._show_in_app_panel(self.tr("settings_title"), 260)
+        panel = self._show_in_app_panel(self.tr("settings_title"), 220)
         tk.Label(panel, text=self.tr("settings_note"), bg=PANEL, fg=TEXT_DIM,
                  font=("Segoe UI", 9), justify="center").pack(pady=(0, 14))
-        tk.Label(panel, text=self.tr("language"), bg=PANEL, fg=TEXT, font=("Segoe UI", 10, "bold")).pack()
-        language_row = tk.Frame(panel, bg=PANEL)
-        language_row.pack(pady=(8, 4))
-        current_language = self.appearance_settings.get("language", "en")
-        for label, value in (("العربية", "ar"), ("English", "en")):
-            selected = current_language == value
-            button = PillButton(language_row, text=label, width=132, height=34, background=PANEL,
-                                fill=RED if selected else CARD, hover_fill=RED_HOVER if selected else CARD_HOVER,
-                                text_color=TEXT, command=lambda lang=value: self._set_appearance(language=lang))
-            button.pack(side="left", padx=4)
 
     def show_library_loading(self) -> None:
         """Make library loading obvious in the main content area, not only in the status corner."""
