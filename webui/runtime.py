@@ -114,7 +114,7 @@ class WebRuntime:
             with self.lock:
                 if self.queue or self.active:
                     return {"status": "hold", "reason": "tasks_active"}
-            valid, reason = self.mina.check_saved_discord_session(force_refresh=True)
+            valid, reason = self.mina.check_saved_discord_session(force_refresh=False)
             if not valid:
                 status = "membership" if reason == "not_in_guild" else "login"
                 if reason == "network" and previous.get("status") == "main":

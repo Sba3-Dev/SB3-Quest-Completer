@@ -390,7 +390,8 @@ def resource_path(name: str) -> Path:
 
 
 def discord_session_file() -> Path:
-    return Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Sba3Dev" / "discord_session.json"
+    base = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA") or str(Path.home())
+    return Path(base) / "Sba3Dev" / "discord_session.json"
 
 
 def load_discord_session() -> dict[str, Any]:
@@ -405,7 +406,9 @@ def save_discord_session(data: dict[str, Any]) -> None:
     try:
         path = discord_session_file()
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        temporary = path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        os.replace(temporary, path)
     except OSError:
         pass
 
