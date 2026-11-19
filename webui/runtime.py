@@ -68,7 +68,7 @@ class WebRuntime:
                   f"https://cdn.discordapp.com/embed/avatars/{int(user_id) % 5 if user_id.isdigit() else 0}.png")
         return {
             "version": self.mina.VERSION,
-            "authenticated": bool(session.get("access_token")),
+            "authenticated": bool(session.get("access_token") or session.get("refresh_token")),
             "user": user,
             "avatar": avatar,
             "games": self._public_games(),
@@ -114,10 +114,12 @@ class WebRuntime:
             with self.lock:
                 if self.queue or self.active:
                     return {"status": "hold", "reason": "tasks_active"}
+            saved_session = self.mina.load_discord_session()
+            has_saved_session = bool(saved_session.get("refresh_token") or saved_session.get("access_token"))
             valid, reason = self.mina.check_saved_discord_session(force_refresh=False)
             if not valid:
                 status = "membership" if reason == "not_in_guild" else "login"
-                if reason == "network" and previous.get("status") == "main":
+                if reason == "network" and (has_saved_session or previous.get("status") == "main"):
                     status = "main"
                 state = {"status": status, "reason": reason, "version": self.mina.VERSION}
             else:

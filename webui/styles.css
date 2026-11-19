@@ -39,3 +39,7 @@ html,body{background:var(--bg)!important;color:var(--text)!important}body:before
 
 /* Immediate click feedback without changing button shapes. */
 button{transition:transform .1s ease,filter .1s ease,background-color .1s ease,border-color .1s ease}button:active{transform:scale(.95)!important;filter:brightness(.86)!important}.primary-button:active,.queue-action:active,.danger-button:active{box-shadow:0 1px 5px rgba(var(--accent-rgb),.22)!important}
+
+/* Final language direction and calm button treatment. */
+.primary-button{background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 48%,var(--bg)))!important;box-shadow:0 5px 15px rgba(var(--accent-rgb),.2)!important}.settings-choice.active{border-color:var(--accent-2)!important;background:var(--card-hover)!important;color:var(--text)!important;box-shadow:0 0 0 1px var(--accent-2),0 0 14px rgba(var(--accent-rgb),.2)}
+html[dir=rtl] .account-menu>button:not(.account-menu-head button){text-align:right}html[dir=rtl] .account-menu-head{direction:rtl}html[dir=rtl] .auth-footer{direction:rtl}html[dir=rtl] .update-meta-item{direction:rtl}html[dir=rtl] .window-controls{margin-left:0;margin-right:2px}

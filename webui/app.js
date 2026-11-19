@@ -29,7 +29,7 @@
     }
   };
   const THEMES = {
-    white: { accent: '#5b8f9d', accent2: '#73b8c4', danger: '#6f3d45', line: '#39464a', cardHover: '#253438', bg: '#101415' },
+    white: { accent: '#eeeeee', accent2: '#ffffff', danger: '#5b5b5b', line: '#4a4a4a', cardHover: '#303030', bg: '#0f0f0f' },
     black: { accent: '#8b8f99', accent2: '#c3c7ce', danger: '#3c3f47', line: '#30333a', cardHover: '#24272d', bg: '#090a0c' },
     midnight: { accent: '#238fca', accent2: '#58b8e8', danger: '#263e5a', line: '#233e52', cardHover: '#183750', bg: '#071018' },
     graphite: { accent: '#477fbe', accent2: '#78a7df', danger: '#3a4659', line: '#34485e', cardHover: '#293f56', bg: '#0b1118' },
