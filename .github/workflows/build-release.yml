@@ -2,6 +2,11 @@ name: Build Windows installer
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to rebuild, for example v0.7.7
+        required: true
+        default: v0.7.7
   release:
     types: [published]
 
@@ -16,10 +21,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Apply release version
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
         shell: pwsh
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
         run: |
           $version = $env:RELEASE_TAG.TrimStart('v')
           if ($version -notmatch '^\d+\.\d+\.\d+$') {
@@ -71,20 +76,20 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
 
       - name: Upload installer to GitHub Release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
         shell: pwsh
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" `
+          gh release upload "$env:RELEASE_TAG" `
             "installer-output/SB3QuestCompleter-Setup.exe" `
             "SB3QuestCompleter-Update.zip" --clobber
 
       - name: Publish update manifest
-        if: github.event_name == 'release'
-        shell: pwsh
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
           REPOSITORY: ${{ github.repository }}
         run: |
           $version = $env:RELEASE_TAG.TrimStart('v')
