@@ -131,6 +131,27 @@ class WebRuntime:
             with self.lock:
                 self.health_busy = False
 
+    def check_updates(self) -> dict[str, Any]:
+        """Perform a fresh manifest request for the manual Settings check."""
+        if not requests or not self.mina.UPDATE_MANIFEST_URL:
+            return {"status": "error", "reason": "updates_unavailable"}
+        try:
+            response = requests.get(self.mina.UPDATE_MANIFEST_URL,
+                                    headers=self.mina.HEADERS, timeout=(5, 15))
+            response.raise_for_status()
+            manifest = response.json()
+            latest = str(manifest.get("version") or "").strip()
+            installer = str(manifest.get("installer_url") or "").strip()
+            if latest and installer and _version_tuple(latest) > _version_tuple(self.mina.VERSION):
+                state = {"status": "update", "version": self.mina.VERSION,
+                         "latest": latest, "manifest": manifest}
+                with self.lock:
+                    self.health_state = state
+                return dict(state)
+            return {"status": "up_to_date", "version": self.mina.VERSION}
+        except Exception as exc:
+            return {"status": "error", "reason": str(exc)}
+
     def _update_only_check(self) -> dict[str, Any]:
         """Check only the manifest; never re-check login or server membership."""
         with self.lock:
@@ -589,6 +610,7 @@ def launch_web_ui() -> bool:
         state_provider=lambda: runtime_holder["runtime"].bootstrap() if "runtime" in runtime_holder else {},
         on_refresh=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_library(),
         on_health=lambda full_check=True: runtime_holder["runtime"].health_check(full_check) if "runtime" in runtime_holder else {},
+        on_check_updates=lambda: runtime_holder["runtime"].check_updates() if "runtime" in runtime_holder else {},
         on_login=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_login(),
         on_support=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].open_support(),
         on_membership=lambda: runtime_holder.get("runtime") and runtime_holder["runtime"].refresh_membership(),
