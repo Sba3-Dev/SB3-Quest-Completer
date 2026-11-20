@@ -1,5 +1,5 @@
 #define MyAppName "SB3 Quest Completer"
-#define MyAppVersion "0.7.10"
+#define MyAppVersion "0.7.11"
 #define MyAppPublisher "Sba3 Dev"
 #define MyAppExeName "SB3QuestCompleter.exe"
 
